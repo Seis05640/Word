@@ -832,6 +832,7 @@
 	Undo {action}	復原{action}
 	Ungroup	取消群組
 	Up	上
+	Update	更新
 	Update Field	更新功能變數
 	Update Index	更新索引
 	Update Style to Match Selection	更新樣式以符合選取範圍

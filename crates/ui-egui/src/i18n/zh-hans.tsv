@@ -842,6 +842,7 @@
 	Undo {action}	撤消{action}
 	Ungroup	取消组合
 	Up	上
+	Update	更新
 	Update Field	更新域
 	Update Index	更新索引
 	Update Style to Match Selection	更新样式以匹配所选内容

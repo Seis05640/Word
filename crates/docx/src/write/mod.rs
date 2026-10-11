@@ -143,6 +143,7 @@ pub fn write_as(doc: &Document, flavor: Flavor) -> Result<Vec<u8>, DocxError> {
     let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
     let mut overrides: Vec<(String, String)> = Vec::new();
     let mut rels = PartRels::default();
+    let mut root = PartRels::default();
 
     // Comments get paragraph ids before any story is written.
     let mut comment_paras: Vec<(u32, String)> = Vec::new();
@@ -328,7 +329,9 @@ pub fn write_as(doc: &Document, flavor: Flavor) -> Result<Vec<u8>, DocxError> {
         }
     }
 
-    // Parts of charts, diagrams and OLE objects kept from a file, as the objects written need them.
+    wr.embeds.custom_xml_rels("D", &mut rels);
+    wr.embeds.custom_xml_rels("P", &mut root);
+    // Parts of embedded objects and custom XML stores kept from the file.
     for (name, bytes, ct, prels) in std::mem::take(&mut wr.embeds.parts) {
         push_part(&mut entries, &mut overrides, &name, bytes, &ct, prels);
     }
@@ -375,7 +378,6 @@ pub fn write_as(doc: &Document, flavor: Flavor) -> Result<Vec<u8>, DocxError> {
     entries.insert(1, ("word/_rels/document.xml.rels".into(), rels.xml()));
 
     // Package-level parts.
-    let mut root = PartRels::default();
     root.add(rt::OFFICE_DOC, "word/document.xml", false);
     root.add(rt::CORE, "docProps/core.xml", false);
     root.add(rt::APP, "docProps/app.xml", false);

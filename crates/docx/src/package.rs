@@ -35,6 +35,7 @@ pub mod rt {
     pub const CHART: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
     pub const DIAGRAM_DATA: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData";
     pub const DIAGRAM_DRAWING: &str = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing";
+    pub const CUSTOM_XML: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
 }
 
 /// `Document::passthrough` key for a macro project, kept as opaque bytes (never parsed or run).
@@ -51,6 +52,9 @@ pub const MAX_VBA_RELATED: usize = 64;
 /// types and own relationships, as [`EmbeddedManifest`] lines. Each part's bytes are kept under its
 /// part name. Not a package part: WordCraft's own bookkeeping.
 pub const EMBEDDED_PARTS: &str = "wordcraft:embedded.parts";
+/// Custom XML roots kept by the package (P) or main document (D): `owner\ttype\tpart`.
+/// Their opaque bytes and related parts use the same bounded manifest as embedded objects.
+pub const CUSTOM_XML_ROOTS: &str = "wordcraft:customXml.roots";
 /// Most parts we carry along for a file's embedded objects.
 pub const MAX_EMBEDDED_PARTS: usize = 4096;
 /// Most relationships we keep for one such part.

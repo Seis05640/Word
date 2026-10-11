@@ -106,7 +106,23 @@ fn paste(s: &mut Session, v: &Value) -> CmdResult {
     // An explicit text param (from the system clipboard) wins unless it matches our own copy.
     let frag = match (p::str(v, "text"), &s.clipboard) {
         (Some(t), Some(f)) if f.plain_text() == t.replace("\r\n", "\n") => f.clone(),
-        (Some(t), _) => Fragment::from_text(&t.replace("\r\n", "\n")),
+        (Some(t), _) => {
+            // Text that is exactly one equation (OMML, MathML or delimited LaTeX) pastes as an
+            // equation; one that cannot be read pastes as the text it is, with a note why.
+            match crate::equashion_bridge::clipboard_equation(t) {
+                Some((format, Ok((math, display)))) => {
+                    let mut r = super::equation::insert_nodes_as_equation(s, math.nodes, &json!({"display": display, "edit": false}))?;
+                    if let Some(o) = r.as_object_mut() {
+                        o.insert("pasted".into(), json!("equation"));
+                        o.insert("format".into(), json!(format.name()));
+                    }
+                    return Ok(r);
+                }
+                Some((format, Err(why))) => s.status = format!("Pasted as text: the {} equation could not be read ({why}).", format.name()),
+                None => {}
+            }
+            Fragment::from_text(&t.replace("\r\n", "\n"))
+        }
         (None, Some(f)) => f.clone(),
         (None, None) => return Err(CmdError::Failed("the clipboard is empty".into())),
     };

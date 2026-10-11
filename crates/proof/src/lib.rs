@@ -574,11 +574,12 @@ mod tests {
     #[test]
     fn external_results_apply_to_their_exact_text() {
         let text = "Zqxv external checker teh text 575.";
-        assert!(!external::has(text));
+        assert!(!external::has(text, "en-US"));
         assert_eq!(external::stamp(text), 0);
         let issue = |start, end, kind| Issue { start, end, kind, message: "m".into(), suggestions: vec!["x".into()] };
         external::put(
             text,
+            "en-US",
             vec![
                 issue(26, 30, IssueKind::Grammar),
                 issue(22, 25, IssueKind::Spelling),
@@ -601,16 +602,32 @@ mod tests {
         let got: Vec<(usize, usize)> = check(text).iter().map(|i| (i.start, i.end)).collect();
         assert_eq!(got, [(22, 25), (26, 30)]);
         // A new result gets a new stamp.
-        external::put(text, Vec::new());
+        external::put(text, "en-US", Vec::new());
         assert!(external::stamp(text) > s1);
         assert!(check(text).is_empty());
+    }
+
+    /// #575 review: a result counts only for the language it was checked in. When the paragraph's
+    /// language changes, the text is checked again and the new result replaces the old one.
+    #[test]
+    fn external_results_belong_to_their_language() {
+        let text = "Les enfant 575 jouent.";
+        let issue = |start, end| Issue { start, end, kind: IssueKind::Spelling, message: "m".into(), suggestions: Vec::new() };
+        external::put(text, "en-US", vec![issue(4, 10)]);
+        assert!(external::has(text, "en-US"));
+        assert!(!external::has(text, "fr-FR"), "a French paragraph needs a French result");
+        let s1 = external::stamp(text);
+        external::put(text, "fr-FR", vec![issue(0, 10)]);
+        assert!(external::has(text, "fr-FR") && !external::has(text, "en-US"));
+        assert!(external::stamp(text) > s1, "the new result redraws the paragraph");
+        assert_eq!(check(text).iter().map(|i| (i.start, i.end)).collect::<Vec<_>>(), [(0, 10)]);
     }
 
     /// #575: a range that cuts a character in two is dropped, never sliced.
     #[test]
     fn external_ranges_off_char_boundaries_are_dropped() {
         let text = "é😀 575 boundaries";
-        external::put(text, vec![Issue { start: 1, end: 3, kind: IssueKind::Grammar, message: String::new(), suggestions: Vec::new() }]);
+        external::put(text, "en-US", vec![Issue { start: 1, end: 3, kind: IssueKind::Grammar, message: String::new(), suggestions: Vec::new() }]);
         assert_eq!(external::get(text), Some(Vec::new()));
     }
 

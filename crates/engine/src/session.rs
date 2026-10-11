@@ -1,13 +1,22 @@
 //! The editing session: document, selection, undo/redo, layout, view state.
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+/// The system locale (BCP 47 tag) the shell found at startup, for Numeral › System.
+static SYSTEM_LOCALE: OnceLock<String> = OnceLock::new();
+
+/// Tell the engine the system locale (the shell calls this once at startup; layout never reads
+/// the environment). Headless sessions without it show Western digits for Numeral › System.
+pub fn set_system_locale(tag: &str) {
+    let _ = SYSTEM_LOCALE.set(tag.to_string());
+}
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use wordcraft_doc::edit::Fragment;
 use wordcraft_doc::props::CharProps;
 use wordcraft_doc::{Document, Path, Pos, StoryRef};
-use wordcraft_layout::{DocLayout, LayoutCache, LayoutOptions, ViewMode};
+use wordcraft_layout::{DocLayout, LayoutCache, LayoutOptions, NumeralMode, ViewMode};
 
 use crate::{CmdError, Registry};
 
@@ -77,6 +86,9 @@ pub struct ViewState {
     pub track_changes_pane: bool,
     /// Check spelling and grammar as you type.
     pub proofing: bool,
+    /// How digits look on screen (Word › File › Options › Advanced › Numeral).
+    #[serde(default)]
+    pub numeral: NumeralMode,
     /// Review › Hide Ink: ink strokes aren't shown on screen (they stay in the document).
     #[serde(default)]
     pub hide_ink: bool,
@@ -115,6 +127,7 @@ impl Default for ViewState {
             show_markup: true,
             track_changes_pane: false,
             proofing: true,
+            numeral: NumeralMode::default(),
             hide_ink: false,
             draw: Default::default(),
             field_codes: false,
@@ -230,7 +243,7 @@ pub struct Session {
     /// mail merge, recover), never on an edit.
     document_id: u64,
     cache: LayoutCache,
-    layout: Option<(u64, f32, ViewMode, Arc<DocLayout>, bool)>,
+    layout: Option<(u64, f32, ViewMode, Arc<DocLayout>, bool, NumeralMode)>,
     /// Picture edits: edited media key → original media key (Reset Picture).
     pub originals: std::collections::HashMap<String, String>,
     /// Last mutating command (Repeat).
@@ -439,11 +452,12 @@ impl Session {
     /// The current layout (recomputed when the document or view changed).
     pub fn layout(&mut self) -> Arc<DocLayout> {
         let ww = self.view.web_width;
-        if let Some((r, w, m, l, pf)) = &self.layout
+        if let Some((r, w, m, l, pf, n)) = &self.layout
             && *r == self.rev
             && (*w == ww || self.view.mode == ViewMode::Print)
             && *m == self.view.mode
             && *pf == self.view.proofing
+            && *n == self.view.numeral
         {
             return l.clone();
         }
@@ -453,16 +467,24 @@ impl Session {
             show_hidden: self.view.marks,
             hide_deleted: !self.view.show_markup || self.prefs.markup.hides_deletions(),
             proofing: self.view.proofing,
+            numeral: self.view.numeral.resolve(SYSTEM_LOCALE.get().map(String::as_str)),
             field_codes: self.view.field_codes,
         };
         let l = Arc::new(wordcraft_layout::layout(&self.doc, &mut self.cache, &opts));
-        self.layout = Some((self.rev, ww, self.view.mode, l.clone(), self.view.proofing));
+        self.layout = Some((self.rev, ww, self.view.mode, l.clone(), self.view.proofing, self.view.numeral));
         l
     }
     /// A layout for output (PDF, images, print): no proofing marks, print view.
     pub fn export_layout(&self) -> Arc<DocLayout> {
-        let opts =
-            LayoutOptions { view: ViewMode::Print, web_width: 0.0, show_hidden: false, hide_deleted: false, proofing: false, field_codes: false };
+        let opts = LayoutOptions {
+            view: ViewMode::Print,
+            web_width: 0.0,
+            show_hidden: false,
+            hide_deleted: false,
+            proofing: false,
+            numeral: NumeralMode::default(),
+            field_codes: false,
+        };
         Arc::new(wordcraft_layout::layout(&self.doc, &mut LayoutCache::new(), &opts))
     }
 

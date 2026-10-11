@@ -80,6 +80,16 @@ impl CellRange {
     }
 }
 
+/// A selection Word's table rule widened to whole cells or rows (`cmd::table::extend_selection`),
+/// and where it really runs.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Widened {
+    /// The selection it became; this is current while `Session::sel` still equals it.
+    pub sel: Selection,
+    /// Where the selection was really extended from and to: extending it again goes on from here.
+    pub ends: Selection,
+}
+
 /// View state that commands can change (ribbon View tab, status bar).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -311,6 +321,9 @@ pub struct Session {
     pub column: Option<ColumnBlock>,
     /// Column selection mode (Ctrl+Shift+F8): caret movement extends the block.
     pub column_mode: bool,
+    /// A selection widened to whole table cells or rows, and where it really runs (see
+    /// [`Session::sel_ends`]).
+    pub(crate) widened: Option<Widened>,
     /// Where the last edits happened, oldest first (at most [`EDIT_MARKS`]), for Go Back
     /// (Shift+F5). Positions aren't mapped through later edits; they're clamped when used.
     edit_marks: Vec<Pos>,
@@ -401,6 +414,7 @@ impl Session {
             password: None,
             column: None,
             column_mode: false,
+            widened: None,
             edit_marks: Vec::new(),
             go_back_step: 0,
         }
@@ -448,6 +462,13 @@ impl Session {
     /// The whole table cells selected, if the selection is that (see [`CellRange`]).
     pub fn cell_range(&self) -> Option<&CellRange> {
         self.column.as_ref().filter(|c| c.sel == self.sel).and_then(|c| c.cells.as_ref())
+    }
+
+    /// The selection as it was made: where a drag, Shift+click or Shift+arrows started and where
+    /// the caret went, even when Word's table rule widened it to whole cells or rows (`sel` holds
+    /// those).
+    pub fn sel_ends(&self) -> &Selection {
+        self.widened.as_ref().filter(|w| w.sel == self.sel).map_or(&self.sel, |w| &w.ends)
     }
 
     /// Document revision (bumped by every change).
@@ -619,6 +640,7 @@ impl Session {
         self.also_selected.clear();
         self.column = None;
         self.column_mode = false;
+        self.widened = None;
         self.edit_marks.clear();
         self.go_back_step = 0;
         self.reset_history();
@@ -692,9 +714,11 @@ impl Session {
             // The save password, like the file path: not an edit to the document.
             password: _,
             also_selected: _,
-            // Column selection, like `sel`'s shape: valid only while `sel` matches it.
+            // Column selection and a widened selection's ends, like `sel`'s shape: valid only while
+            // `sel` matches them.
             column: _,
             column_mode: _,
+            widened: _,
             // Go Back's places, like the caret history: not part of the document.
             edit_marks: _,
             go_back_step: _,

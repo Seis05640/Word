@@ -1,6 +1,6 @@
 # WordCraft parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** trivial (all 12 bibliography styles, #383; previously trivial: formatting revisions landed, #41; previously trivial: Draw Table and Eraser landed, #303; previously minor: readiness table with hours per audience; full number back to the additive weighted sum, 60%; mainstream and essentials numbers added; alpha gate checked; previously major: full re-measure against Word for Mac 16.113.4; replaces the parity tables that lived in ROADMAP.md) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-11 · **Change:** minor (local desktop recovery; no readiness percentage change) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 The authoritative assessment of how close WordCraft is to Microsoft Word. [`ROADMAP.md`](../ROADMAP.md)
 summarizes it; [`gaps.md`](gaps.md) itemizes every shortfall; the deep checklists are
@@ -191,7 +191,7 @@ Word. Their weighted sum is the **full ready for real work** number.
 | File formats (DOCX fidelity first) | 20% | 60% | 185–300 | [file-format-parity.md](file-format-parity.md) | DOCX opens in Word and round-trips our own tests, but no real-world corpus test yet; charts, SmartArt, OLE, content controls (unwrapped), move tracking and encrypted files are lost or refused |
 | Layout and pagination fidelity | 15% | 55% | 90–145 | [layout-parity.md](layout-parity.md) | Aptos has no metric-matched substitute so lines break differently from Word; no column balancing, footnote continuation or document grid; compatibility modes beyond 15 partial |
 | UI/UX fidelity | 10% | 65% | 65–100 | [ui-parity.md](ui-parity.md) | Ribbon, keytips, mini-toolbar, Backstage, 101 shortcuts; 16 modal dialogs against Word's ~100; no ribbon/keyboard customization |
-| Stability | 10% | 50% | 25–45 | [gaps.md](gaps.md) | Never-crash standard and hostile-param fuzzing in place, but open reports of a startup crash on Intel UHD (#170), freezes (#77, #59, #31) and Windows write failure without admin (#218); no soak test; 5 days of field history |
+| Stability | 10% | 50% | 25–45 | [gaps.md](gaps.md) | Never-crash standard and hostile-param fuzzing in place, but open reports of a startup crash on Intel UHD (#170), freezes (#77, #59, #31) and Windows write failure without admin (#218); local desktop recovery with focused lifecycle tests, but no longer soak test; 5 days of field history |
 | Performance | 5% | 75% | 10–20 | [layout-parity.md](layout-parity.md) | 61 ms cold layout and 1.4 ms relayout on a 188-page document (measured 2026-10-06, not re-run); font picker freezes fixed in #233; no large real-world documents measured |
 | Localization | 4% | 25% | 80–130 + native review | [localization-parity.md](localization-parity.md) | 9 UI languages (Word 30); 4 of the 12 key languages partly done; English-only proofing |
 | Platforms | 3% | 95% | 5–10 | [ROADMAP.md](../ROADMAP.md) | macOS (universal, signed), Windows x64/x86/arm64, Linux (AppImage/deb/rpm/Flatpak), FreeBSD, web. Beyond Word on Linux, BSD and the web; Word's iPad/iPhone/Android apps are out of scope |
@@ -249,6 +249,7 @@ can be used without committing Word output.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | minor | Local desktop recovery implemented; original files are protected, password sessions skip plaintext recovery. Crash prevention and broader field/soak validation remain. No change to stability or readiness estimates. |
 | 2026-10-11 | trivial | References: all 12 of Word's bibliography styles (eight more: Harvard, ISO 690 ×2, Turabian, GB/T 7714, GOST ×2, SIST02) (#383); no percentage change |
 | 2026-10-11 | trivial | Mail merge fixes (#427–#430): SKIPIF drops matching records, NEXT advances later fields, IF previews, header/footer fields merge; Mailings row updated, no percentage change |
 | 2026-10-11 | trivial | Formatting revisions (#41): Review row updated; no percentage change |

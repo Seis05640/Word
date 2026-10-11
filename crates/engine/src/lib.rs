@@ -11,6 +11,7 @@ pub mod cmd;
 pub mod io;
 mod io_ext;
 pub mod math_gallery;
+pub mod recovery;
 pub mod sample;
 mod session;
 pub mod speech;

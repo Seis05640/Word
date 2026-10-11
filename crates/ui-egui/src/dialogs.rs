@@ -168,6 +168,10 @@ pub enum Dialog {
     /// Finish & Merge replaces the document (see [`WordApp::run`]); `then` runs once it is
     /// answered (`ui.saveChanges`), and only while the document it asked about
     /// (`Session::document_id`) is still the one open.
+    DiscardRecovery {
+        id: String,
+        name: String,
+    },
     SaveChanges {
         name: String,
         then: String,
@@ -638,6 +642,7 @@ impl Dialog {
             Dialog::PasteSpecial { .. } => "pasteSpecial",
             Dialog::About { .. } => "about",
             Dialog::SaveChanges { .. } => "saveChanges",
+            Dialog::DiscardRecovery { .. } => "discardRecovery",
             Dialog::RecipientList { .. } => "recipientList",
             Dialog::InsertMergeField { .. } => "insertMergeField",
             Dialog::FindRecipient { .. } => "findRecipient",
@@ -926,6 +931,7 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         Dialog::PasteSpecial { .. } => "Paste Special",
         Dialog::About { .. } => "About WordCraft",
         Dialog::SaveChanges { .. } => "WordCraft",
+        Dialog::DiscardRecovery { .. } => "Discard recovery copy",
         Dialog::RecipientList { .. } => "Recipient List",
         Dialog::InsertMergeField { .. } => "Insert Merge Field",
         Dialog::FindRecipient { .. } => "Find Recipient",
@@ -1639,6 +1645,32 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             }
             let (ok, cancel) = buttons(ui, tl!("Close"));
             ok || cancel
+        }
+        Dialog::DiscardRecovery { name, .. } => {
+            ui.label(crate::i18n::fmt(tl!("Discard the recovery copy of {name}?"), &[("name", name)]));
+            ui.label(tl!("This cannot be undone. Your original file stays unchanged."));
+            let answer = ui
+                .horizontal(|ui| {
+                    let cancel = ui.button(tl!("Cancel"));
+                    let discard = ui.button(tl!("Discard"));
+                    if cancel.clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                        Some("cancel")
+                    } else if discard.clicked() {
+                        Some("discard")
+                    } else {
+                        None
+                    }
+                })
+                .inner;
+            if let Some(answer) = answer {
+                app.dialog = Some(d.clone());
+                let result = app.run("ui.recoveryDiscard", json!({"answer": answer}));
+                if let Err(e) = &result {
+                    app.status(e.clone());
+                }
+                return result.is_ok();
+            }
+            false
         }
         Dialog::SaveChanges { name, .. } => {
             ui.label(egui::RichText::new(crate::i18n::fmt(tl!("Do you want to save changes to {name}?"), &[("name", name)])).font(semibold(15.0)));

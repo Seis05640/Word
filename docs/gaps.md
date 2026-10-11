@@ -1,11 +1,15 @@
 # Where WordCraft falls short of Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** trivial (formatting revisions landed, #41; previously trivial: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: first version; every known shortfall from the 2026-10-10 re-measure, ranked) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-11 · **Change:** minor (local desktop recovery; no readiness percentage change) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 The work list. One entry per shortfall, ranked by how much it stops a Word user from switching
 (**B** = blocks beta). Each says what's missing, the evidence, who it hurts, an Opus 5.5 agent
 wall-clock estimate, and which parity document tracks it. Agents: pick from the top, check open PRs
 first (`gh pr list`), and update this file and the parity doc when a gap closes.
+
+Local desktop recovery now covers unsaved drafts and edits to existing files; see
+[recovery.md](recovery.md). This narrows gap #3 but does not resolve the crash/hang reports or
+establish cross-platform reliability.
 
 ## Ranked
 
@@ -66,6 +70,7 @@ The same gaps grouped the way the parity documents are, for agents working in on
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | minor | Gap #3 narrowed: local desktop recovery snapshots, discovery, unsaved restore and confirmed discard are implemented. Password sessions skip plaintext copies. Crash prevention, Windows field testing and soak testing remain; readiness estimates unchanged. |
 | 2026-10-11 | trivial | All 12 bibliography styles landed (#383); removed from References depth |
 | 2026-10-11 | trivial | Formatting revisions landed (#41); gap #5 narrowed to move tracking and content controls, 8–12 h |
 | 2026-10-10 | trivial | Draw Table and Eraser landed (#303); removed from the feature-gap list |

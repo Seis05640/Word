@@ -260,6 +260,15 @@ instead, without setting anything. The log file records the choice (lines starti
 RISC-V (riscv64): `wordcraft-<ver>-linux-riscv64.tar.gz`, a tarball cross-compiled for glibc 2.39+
 (Ubuntu 24.04, Debian 13 and newer).
 
+**Wayland:** on a Wayland desktop the app runs through XWayland when it is available, because
+winit (the windowing library) supports dragging files into the window only on X11. To use the
+native Wayland backend instead (for example for sharper text with fractional scaling, at the cost
+of file drag-and-drop), start it with `WORDCRAFT_WAYLAND=1`:
+
+```sh
+WORDCRAFT_WAYLAND=1 wordcraft
+```
+
 ### FreeBSD
 
 | Build | File |

@@ -5,7 +5,7 @@ mod diagram;
 mod drawing_color;
 mod embed;
 mod freeform;
-mod math;
+pub(crate) mod math;
 mod props;
 mod story;
 

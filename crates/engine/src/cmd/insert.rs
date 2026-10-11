@@ -26,7 +26,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("insert.table", "Table", "Insert › Tables", table).params(r#"{"rows": n, "cols": n, "style"?: string}"#),
         CommandSpec::new("insert.picture", "Pictures", "Insert › Illustrations", picture).params(r#"{"path"?: string, "data"?: base64, "width"?: pt, "alt"?: string}"#),
         CommandSpec::new("insert.shape", "Shapes", "Insert › Illustrations", shape)
-            .params(r#"{"kind": "rectangle|roundedRectangle|ellipse|triangle|diamond|line|arrow|star|heart", "width"?: pt, "height"?: pt, "fill"?: "RRGGBB", "stroke"?: "RRGGBB"}"#),
+            .params(r#"{"kind": string, "width"?: pt, "height"?: pt, "fill"?: "RRGGBB", "stroke"?: "RRGGBB", "x"?: pt, "y"?: pt, "anchor"?: "margin|page|paragraph", "wrap"?: "square|inline"}"#),
         CommandSpec::new("insert.textBox", "Text Box", "Insert › Text", text_box)
             .params(r#"{"text"?: string, "width"?: pt, "height"?: pt}"#)
             .when(|s| {
@@ -245,27 +245,34 @@ fn shape(s: &mut Session, v: &Value) -> CmdResult {
     let kind: ShapeKind =
         serde_json::from_value(v.get("kind").cloned().unwrap_or(json!("rectangle"))).map_err(|e| CmdError::Params(e.to_string()))?;
     let w = p::f32(v, "width").unwrap_or(108.0).clamp(4.0, 2000.0);
-    let h = p::f32(v, "height").unwrap_or(if kind == ShapeKind::Line { 1.0 } else { 72.0 }).clamp(1.0, 2000.0);
+    let h = p::f32(v, "height").unwrap_or(if kind.is_line_like() { 1.0 } else { 72.0 }).clamp(1.0, 2000.0);
     let fill = match p::str(v, "fill") {
         Some(c) => Rgb::parse(c),
-        None if kind == ShapeKind::Line => None,
+        None if kind.is_line_like() => None,
         None => Some(Rgb(0x15, 0x60, 0x82)),
     };
     let stroke = p::str(v, "stroke").and_then(Rgb::parse).or(Some(Rgb(0x0E, 0x40, 0x5A)));
+    let (x, y) = (p::f32(v, "x"), p::f32(v, "y"));
+    let anchor = match p::str(v, "anchor") {
+        Some("page") => wordcraft_doc::para::Anchor::Page,
+        Some("paragraph") => wordcraft_doc::para::Anchor::Paragraph,
+        _ => wordcraft_doc::para::Anchor::Margin,
+    };
+    let float = match (x, y) {
+        (Some(x), Some(y)) => Float {
+            wrap: if p::str(v, "wrap").is_some_and(|w| w == "inline") { Wrap::Inline } else { Wrap::Square },
+            h_rel: anchor,
+            v_rel: anchor,
+            x: x.clamp(-5000.0, 5000.0),
+            y: y.clamp(-5000.0, 5000.0),
+            dist: 0.0,
+            ..Default::default()
+        },
+        _ => Float { wrap: Wrap::Inline, ..Default::default() },
+    };
     let props = s.typing_props();
     let at = delete_selection(s)?;
-    let obj = InlineObject::Shape {
-        kind,
-        w,
-        h,
-        fill,
-        stroke,
-        stroke_width: 1.0,
-        float: Float { wrap: Wrap::Inline, ..Default::default() },
-        story: None,
-        freeform: None,
-        effects: Default::default(),
-    };
+    let obj = InlineObject::Shape { kind, w, h, fill, stroke, stroke_width: 1.0, float, story: None, freeform: None, effects: Default::default() };
     let end = s.doc.insert_object(&at, obj, &props)?;
     s.sel = Selection { anchor: at, focus: end };
     sel_result(s)

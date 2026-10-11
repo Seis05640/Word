@@ -1277,14 +1277,17 @@ fn rulers(app: &mut WordApp, ui: &mut Ui, h: Rect, v: Rect, rects: &[Rect], layo
     ] {
         margin_handle(app, ui, edge, zone, |p| (p.x - x0) / scale, &sect);
     }
-    // Indent markers for the caret's paragraph (relative to its column).
-    let col_x = page.body.x;
+    // In a table, its column borders; registered before the indent markers, which keep the
+    // pointer where they overlap.
+    crate::table_ruler::columns(app, ui, layout, pi, bar, x0, scale);
+    // Indent markers for the caret's paragraph (relative to its column, or in a table to the
+    // cell's text).
+    let (col_x, w) = crate::table_ruler::text_area(app, layout, pi).unwrap_or((page.body.x, page.body.w));
     if let Some(para) = app.session.doc.para_at(&app.session.sel.focus) {
         let rp = app.session.doc.styles.resolve_para(&para.props);
         // Indents and tabs are measured from the paragraph's start edge: the right margin of a
         // right-to-left paragraph, where the start-indent markers sit.
         let rtl = rp.bidi;
-        let w = page.body.w;
         let sx = |s: f32| if rtl { x0 + (col_x + w - s) * scale } else { x0 + (col_x + s) * scale };
         let s_at = |x: f32| if rtl { col_x + w - (x - x0) / scale } else { (x - x0) / scale - col_x };
         let first = sx(rp.indent_left + rp.indent_first);
@@ -1333,7 +1336,7 @@ fn rulers(app: &mut WordApp, ui: &mut Ui, h: Rect, v: Rect, rects: &[Rect], layo
         if r.dragged()
             && let Some(pp) = r.interact_pointer_pos()
         {
-            let pt = s_at(pp.x).clamp(-col_x, page.body.w - 18.0);
+            let pt = s_at(pp.x).clamp(-col_x, (w - 18.0).max(-col_x));
             let snapped = (pt / 4.5).round() * 4.5;
             if !r.drag_started() {
                 app.session.join_next_undo();
@@ -1356,7 +1359,7 @@ fn rulers(app: &mut WordApp, ui: &mut Ui, h: Rect, v: Rect, rects: &[Rect], layo
         if r.dragged()
             && let Some(pp) = r.interact_pointer_pos()
         {
-            let pt = page.body.w - s_at(pp.x);
+            let pt = w - s_at(pp.x);
             if !r.drag_started() {
                 app.session.join_next_undo();
             }
@@ -1392,6 +1395,8 @@ fn rulers(app: &mut WordApp, ui: &mut Ui, h: Rect, v: Rect, rects: &[Rect], layo
             break;
         }
     }
+    // In a table, its rows' bottom borders.
+    crate::table_ruler::rows(app, ui, layout, pi, vbar, y0, scale);
 }
 
 /// One edge of a page's text area on a ruler.

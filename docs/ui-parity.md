@@ -1,6 +1,6 @@
 # UI parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** trivial (table selection areas, insert buttons, move handle and double-click AutoFit on the page; previously trivial: table borders and the resize handle drag on the page, #217; previously trivial: shortcuts: Move Paragraph Up/Down, Promote/Demote, Go Back, Alt+X, #343) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** trivial (table context menu: Select, Delete Cells, Split Cells, Distribute, AutoFit, Text Direction, Cell Alignment and Table Properties…; previously trivial: table selection areas, insert buttons, move handle and double-click AutoFit on the page; previously trivial: table borders and the resize handle drag on the page, #217; previously trivial: shortcuts: Move Paragraph Up/Down, Promote/Demote, Go Back, Alt+X, #343) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 How WordCraft looks and feels next to Word: ribbon, dialogs, panes, keyboard, mouse and touch.
 Typing behaviour has its own checklist ([`typing-parity.md`](typing-parity.md)). All assets are our
@@ -18,7 +18,7 @@ own (`AGENTS.md`: no Microsoft iconography, ever).
 | Keyboard shortcuts | **125** commands bound in `CommandSpec::key`, 144 key combinations (measured on Linux/Windows); styles, spacing, symbols, fields, views, mail merge (#330); field keys Alt+F9, Shift+F9, Ctrl+Shift+F9, Ctrl+F11, Ctrl+Shift+F11, F11, Shift+F11 (#339); Alt+Shift+arrows (move paragraphs, promote/demote), Shift+F5 Go Back and Alt+X (#343). Missing: en dash on the numeric keypad | ~250 default shortcuts | ~70% | 2–4 |
 | Modal dialogs | **36** (`Dialog` enum: Font, Paragraph, Tabs, Borders and Shading, Find, Go To, Insert Table, Table Properties, Page Setup, Link, Bookmark, Word Count, Zoom, Watermark, New Style, Modify Style, Manage Styles, Table Style, Commands, Paste Special, About, Save Changes, Password, Encrypt with Password, Define New Multilevel List, Track Changes Options; Columns, Symbol with Special Characters, Field (#321); Field code (#339); mail merge Recipients, Insert Merge Field, Find Recipient, Rules, Match Fields, Check for Errors) plus panes and menus for the rest | ~100 (Caption, Index, TOC options, Citation, Compare, Protect, Language, Hyphenation, Line Numbers, Envelopes, Labels, AutoCorrect, Options panes…) | ~40% | 20–30 |
 | Task panes (Navigation, Styles, Comments, Reviewing, Format Picture/Shape, Thesaurus, Accessibility, Clipboard, Selection) | Navigation, Styles, Comments, Thesaurus, Accessibility, Read Aloud, Zotero; Style Inspector (#236); Clipboard pane (#264) open | all | 70% | 4–6 |
-| Context menus (right-click) | text, spelling suggestions, fields (Update Field, Edit Field…, Toggle Field Codes, #339); objects and tables partial | rich per context | 55% | 3–5 |
+| Context menus (right-click) | text, spelling suggestions, fields (Update Field, Edit Field…, Toggle Field Codes, #339); tables (Insert, Delete, Select, Merge and Split Cells, Distribute, AutoFit, Text Direction, Cell Alignment, Table Properties…; no Border Styles yet); objects partial | rich per context | 60% | 2–4 |
 | Backstage (Home, New, Open, Info, Save As, Print, Share, Export, Options) | Home and New separate (#254), Info properties kept (#268) | | 68% | 4–6 |
 | Rulers: indents, tabs, margins, table columns | indents draggable (one undo, #62); tabs; table column drag pending (#49) | ✅ | 70% | 2–3 |
 | On-canvas objects: select, drag, resize handles, nudge | ✅ tested (#228) | ✅ | 75% | — |
@@ -42,6 +42,7 @@ own (`AGENTS.md`: no Microsoft iconography, ever).
 | 2026-10-11 | minor | Keyboard shortcuts 101 → 125 commands (#330): Reset Paragraph/Character Formatting, symbols, DATE/TIME/PAGE fields, view switches, Word Count, mail merge, F4 Repeat now reachable |
 | 2026-10-11 | trivial | Collapsed duplicate rows left by parallel merges |
 | 2026-10-11 | trivial | Dialogs keep their top edge in place when switching tabs (Paragraph, Font, Borders and Shading…): only the bottom edge moves (#507) |
+| 2026-10-11 | trivial | Table context menu: Select, Delete Cells, Split Cells, Distribute Rows and Columns, AutoFit, Text Direction, Cell Alignment and Table Properties… join Insert, Delete and Merge Cells; a right-click beside selected cells drops them |
 | 2026-10-11 | trivial | Tables on the page: selection areas for columns, rows and cells, "+" insert buttons, the move handle and double-click AutoFit; Select Column in the ribbon |
 | 2026-10-11 | trivial | Tables on the page: column and row borders and the resize handle drag, with a dashed guide and one undo step per drag (#217) |
 | 2026-10-11 | trivial | Interface size setting in File › Options › General (80–200 %), kept between runs and applied on top of the system's display scale; `ui.interfaceSize` for agents (#475) |

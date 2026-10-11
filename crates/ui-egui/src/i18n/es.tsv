@@ -161,6 +161,7 @@
 	Cancel	Cancelar
 	Capitalize Each Word	Mayúscula inicial en cada palabra
 	Captions	Leyendas
+	Cell Alignment	Alineación de celda
 	Cell Margins	Márgenes de celda
 	Cell Size	Tamaño de celda
 	Cell\nMargins	Márgenes de\ncelda
@@ -810,6 +811,7 @@
 	Table Design	Diseño de tabla
 	Table Layout	Disposición de tabla
 	Table Properties	Propiedades de tabla
+	Table Properties…	Propiedades de tabla…
 	Table Row Height	Alto de fila de tabla
 	Table Style Options	Opciones de estilo de tabla
 	Table Styles	Estilos de tabla

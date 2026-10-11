@@ -1,6 +1,6 @@
 # Localization parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (Turkish interface added; previously major: first version; catalogs measured from `crates/ui-egui/src/i18n`, Word's languages from its bundle listing) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (Danish grammar flags: split compounds, present tense after *at*; previously minor: Danish spelling, round 2; previously minor: Danish spelling; previously minor: Turkish interface added; previously major: first version; catalogs measured from `crates/ui-egui/src/i18n`, Word's languages from its bundle listing) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 Interface languages, script support and proofing per language. How translation works (catalog
 format, adding a language, clean-room rule): `crates/ui-egui/src/i18n/mod.rs`.
@@ -27,7 +27,13 @@ other ~18 languages Word ships, plus native-speaker review (human).
   Read Aloud, Backstage greetings) aren't wrapped in `tl!` yet, so they show in English in every
   language: the true share of visible strings is **~93–95%** (estimated).
 - Pending PRs: German (#203), Norwegian Bokmål (#208) and Nynorsk (#210), Hebrew with RTL (#20).
-- **Proofing: English only** (one dictionary, rule-based grammar, English hyphenation patterns).
+- **Proofing: English and Danish spelling.** Each run's language (Review › Language) picks the
+  dictionary. Danish uses every form in Retskrivningsordbogen 5.1 and Den Danske Ordbog's lemma
+  list (COR, CC0), Danish places and common names (Wikidata), compound analysis and corpus
+  frequencies: 6.5 false flags per 1,000 lowercase words on Danish Wikipedia, 19.2 on
+  capitalised ones (mostly foreign names). Compounds written apart (*tog station*) and present tense
+  after *at* or a modal verb (*at bliver*) get grammar flags. Grammar and hyphenation are English only; other languages have no
+  dictionary.
 - Document scripts: shaping via HarfRust (HarfBuzz port) for every script; bidi (UAX #9) and Arabic
   shaping tested (#207); IME on all desktop platforms (winit fixes pending, #155–#164).
 
@@ -76,6 +82,9 @@ proofing is not included; terminology and checks: [`localization-tr.md`](localiz
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | minor | Danish grammar flags: split compounds (*tog station*), present tense after *at* or a modal verb (*at bliver*) |
+| 2026-10-11 | minor | Danish spelling, round 2: COR.EXT, names, frequencies |
+| 2026-10-11 | minor | Danish spelling: COR₁ lexicon, compounds, per-run language |
 | 2026-10-10 | minor | Russian interface (#300; 1,524 entries, built-in style names shown translated; covers everything the interface audit finds) |
 | 2026-10-11 | minor | Turkish interface catalog (1,307 entries), locale selection, saved preference, Turkish casing in command search and font coverage checks; catalog sizes re-counted |
 | 2026-10-11 | trivial | English spelling (#520): our supplement `assets/spelling/en-extra.txt` adds ~220 common modern words the Moby list lacks ("desktop", "download", "email"…) |

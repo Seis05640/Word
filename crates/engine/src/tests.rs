@@ -2993,3 +2993,21 @@ fn note_options_per_section_and_convert_notes() {
     assert_eq!(s.doc.parts[&b].kind, PartKind::Footnote);
     assert!(s.run("references.convertNotes", &json!({"to": "sideways"})).is_err());
 }
+
+#[test]
+fn danish_proofing_follows_run_language() {
+    let mut s = s();
+    run(&mut s, "text.insert", json!({"text": "Huus og sommerferie paa kontoret"}));
+    let words = |s: &mut Session| -> Vec<String> {
+        let v = run(s, "review.issues", json!({}));
+        v.as_array().into_iter().flatten().filter(|i| i["kind"] == "spelling").map(|i| i["text"].as_str().unwrap_or("").to_string()).collect()
+    };
+    // English by default: the Danish words are unknown.
+    assert!(words(&mut s).len() >= 3, "{:?}", words(&mut s));
+    run(&mut s, "select.all", json!({}));
+    run(&mut s, "review.language", json!({"lang": "da-DK"}));
+    assert_eq!(words(&mut s), vec!["Huus", "paa"]);
+    let v = run(&mut s, "review.issues", json!({}));
+    let paa = v.as_array().and_then(|a| a.iter().find(|i| i["text"] == "paa")).cloned().unwrap_or_default();
+    assert_eq!(paa["suggestions"][0], "på", "{paa}");
+}

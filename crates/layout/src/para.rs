@@ -2119,10 +2119,19 @@ fn proof_issues(p: &Paragraph) -> Vec<(usize, usize, bool)> {
     let skip = |a: usize, b: usize| {
         p.run_ranges().any(|(r, c)| r.start < b && a < r.end && (c.no_proof == Some(true) || c.hidden == Some(true) || c.link.is_some()))
     };
-    let mut v: Vec<(usize, usize, bool)> =
-        wordcraft_proof::check_spelling(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, false)).collect();
+    let mut v: Vec<(usize, usize, bool)> = wordcraft_proof::check_spelling_by(&text, |off| proof_lang(p, off))
+        .into_iter()
+        .filter(|i| !skip(i.start, i.end))
+        .map(|i| (i.start, i.end, i.kind == wordcraft_proof::IssueKind::Grammar))
+        .collect();
     v.extend(wordcraft_proof::check_grammar(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, true)));
     v
+}
+
+/// Proofing language of the run at byte `off` (its `lang`, else English).
+pub fn proof_lang(p: &Paragraph, off: usize) -> wordcraft_proof::Lang {
+    let c = p.run_ranges().find(|(r, _)| r.start <= off && off < r.end).map(|(_, c)| c);
+    wordcraft_proof::Lang::from_tag(c.and_then(|c| c.lang.as_deref()))
 }
 
 /// Text for proofing with the same byte offsets: inline objects and tracked deletions become

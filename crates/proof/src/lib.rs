@@ -5,17 +5,39 @@
 //!   (`assets/spelling/en-extra.txt`: `desktop`, `email`, `download`…), with inflections (`-s`,
 //!   `-es`, `-ed`, `-ing`, `-ly`, `'s`…), a user dictionary and ignore lists; suggestions by edit
 //!   distance.
+//! - **Danish spelling** ([`da`]): every form in Retskrivningsordbogen (COR₁, CC0) plus compound
+//!   analysis; pick the language per word with [`Lang`].
 //! - **Grammar** checks that are cheap and reliable: repeated words, `a`/`an`, capital letter
 //!   after a sentence end, spaces before punctuation, doubled spaces.
 //! - **Hyphenation** ([`hyphen`]): dictionary, Liang patterns, heuristic.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod da;
 pub mod dict;
 pub mod hyphen;
+pub mod lexicon;
 pub mod patterns;
 
 use std::collections::HashSet;
 use std::sync::{OnceLock, RwLock};
+
+/// Proofing language.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Lang {
+    #[default]
+    En,
+    Da,
+}
+
+impl Lang {
+    /// Language from a BCP 47 tag (`da`, `da-DK` → Danish); anything else is English.
+    pub fn from_tag(tag: Option<&str>) -> Lang {
+        match tag.and_then(|t| t.split(['-', '_']).next()) {
+            Some(p) if p.eq_ignore_ascii_case("da") => Lang::Da,
+            _ => Lang::En,
+        }
+    }
+}
 
 /// A problem found in text: byte range, kind, message and suggestions.
 #[derive(Clone, Debug, PartialEq)]
@@ -124,9 +146,14 @@ fn known_core(w: &str) -> bool {
     false
 }
 
-/// Is `word` spelled correctly? Numbers, single letters, ALL-CAPS acronyms, URLs and words with
-/// digits are accepted.
+/// Is `word` spelled correctly (English)? See [`is_correct_in`].
 pub fn is_correct(word: &str) -> bool {
+    is_correct_in(word, Lang::En)
+}
+
+/// Is `word` spelled correctly in `lang`? Numbers, single letters, ALL-CAPS acronyms, URLs and
+/// words with digits are accepted.
+pub fn is_correct_in(word: &str, lang: Lang) -> bool {
     let w = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '\'');
     let w = w.trim_matches('\'');
     if w.chars().count() <= 1 || w.chars().any(|c| c.is_ascii_digit()) || !w.chars().any(char::is_alphabetic) {
@@ -139,6 +166,9 @@ pub fn is_correct(word: &str) -> bool {
         return true; // other scripts: no dictionary
     }
     let lower = w.to_lowercase().replace('’', "'");
+    if lang == Lang::Da {
+        return user_words().read().unwrap_or_else(|e| e.into_inner()).contains(&lower) || da::is_correct(&w.replace('’', "'"));
+    }
     if known_core(&lower) {
         return true;
     }
@@ -149,12 +179,20 @@ pub fn is_correct(word: &str) -> bool {
     false
 }
 
-/// Spelling suggestions for a misspelled word (best first, at most `max`).
+/// Spelling suggestions for a misspelled English word (best first, at most `max`).
 pub fn suggest(word: &str, max: usize) -> Vec<String> {
+    suggest_in(word, max, Lang::En)
+}
+
+/// Spelling suggestions for a misspelled word in `lang` (best first, at most `max`).
+pub fn suggest_in(word: &str, max: usize, lang: Lang) -> Vec<String> {
     let lower = word.to_lowercase();
     let n = lower.chars().count();
     if n == 0 || n > 40 {
         return Vec::new();
+    }
+    if lang == Lang::Da {
+        return da::suggest(word, max).into_iter().map(|w| match_case(word, w)).collect();
     }
     let d = dict::Dictionary::en_us();
     let mut scored: Vec<(usize, i64, String)> = Vec::new();
@@ -171,26 +209,23 @@ pub fn suggest(word: &str, max: usize) -> Vec<String> {
         }
     }
     scored.sort_by(|a, b| (a.0, a.1, a.2.len().abs_diff(n)).cmp(&(b.0, b.1, b.2.len().abs_diff(n))).then(a.2.cmp(&b.2)));
-    let cap = word.chars().next().is_some_and(char::is_uppercase);
-    let upper = word.chars().all(|c| !c.is_lowercase());
-    scored
-        .into_iter()
-        .take(max)
-        .map(|(_, _, w)| {
-            if upper && n > 1 {
-                w.to_uppercase()
-            } else if cap {
-                let mut c = w.chars();
-                c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or(w)
-            } else {
-                w
-            }
-        })
-        .collect()
+    scored.into_iter().take(max).map(|(_, _, w)| match_case(word, w)).collect()
+}
+
+/// `w` in the case pattern of `typed`: ALL CAPS or Capitalised (never lowers a suggestion).
+fn match_case(typed: &str, w: String) -> String {
+    if typed.chars().count() > 1 && typed.chars().all(|c| !c.is_lowercase()) {
+        w.to_uppercase()
+    } else if typed.chars().next().is_some_and(char::is_uppercase) {
+        let mut c = w.chars();
+        c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or(w)
+    } else {
+        w
+    }
 }
 
 /// Optimal string alignment distance, early-exit at 3.
-fn damerau(a: &[char], b: &str) -> usize {
+pub(crate) fn damerau(a: &[char], b: &str) -> usize {
     let b: Vec<char> = b.chars().collect();
     let (n, m) = (a.len(), b.len());
     let mut prev2 = vec![0usize; m + 1];
@@ -253,8 +288,15 @@ pub fn words(text: &str) -> Vec<(usize, usize)> {
         .collect()
 }
 
-/// Spelling issues in a paragraph of text (no suggestions; ask [`suggest`] on demand).
+/// English spelling issues in a paragraph of text. See [`check_spelling_by`].
 pub fn check_spelling(text: &str) -> Vec<Issue> {
+    check_spelling_by(text, |_| Lang::En)
+}
+
+/// Spelling issues in a paragraph of text, the language of each word given by `lang_at(byte
+/// offset)` (no suggestions; ask [`suggest_in`] on demand), plus Danish split compounds and
+/// present-for-infinitive errors (grammar issues, with their fix as suggestion).
+pub fn check_spelling_by(text: &str, lang_at: impl Fn(usize) -> Lang) -> Vec<Issue> {
     let mut v = Vec::new();
     for (a, b) in words(text) {
         let Some(w) = text.get(a..b) else { continue };
@@ -265,8 +307,29 @@ pub fn check_spelling(text: &str) -> Vec<Issue> {
         if token.contains("://") || token.contains('@') || token.starts_with("www.") {
             continue;
         }
-        if !is_correct(w) {
+        if !is_correct_in(w, lang_at(a)) {
             v.push(Issue { start: a, end: b, kind: IssueKind::Spelling, message: "Possible spelling mistake".into(), suggestions: Vec::new() });
+        }
+    }
+    // Danish compounds written apart ("tog station" → "togstation") and present tense after "at"
+    // or a modal verb ("at bliver" → "at blive").
+    for pair in words(text).windows(2) {
+        let [(a0, b0), (a1, b1)] = pair else { continue };
+        if lang_at(*a0) != Lang::Da || lang_at(*a1) != Lang::Da || text.get(*b0..*a1) != Some(" ") {
+            continue;
+        }
+        let (Some(w0), Some(w1)) = (text.get(*a0..*b0), text.get(*a1..*b1)) else { continue };
+        if let Some(joined) = da::split_compound(w0, w1) {
+            v.push(Issue { start: *a0, end: *b1, kind: IssueKind::Grammar, message: "Possible split compound".into(), suggestions: vec![joined] });
+        }
+        if let Some(inf) = da::present_for_infinitive(w0, w1) {
+            v.push(Issue {
+                start: *a1,
+                end: *b1,
+                kind: IssueKind::Grammar,
+                message: format!("Use the infinitive after \"{w0}\""),
+                suggestions: vec![inf],
+            });
         }
     }
     v

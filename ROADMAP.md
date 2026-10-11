@@ -131,6 +131,10 @@ Ranked, to beta (detail and remaining milestones in [docs/roadmap.md](docs/roadm
 
 | Date | What landed |
 |---|---|
+| 2026-10-11 | Danish spelling: every form in Retskrivningsordbogen 5.1 (COR₁, CC0, 396 KB asset), compound analysis (*kaffekop*, *Københavnsområdet*), aa/æ/ø/å-aware suggestions; each run's language picks the dictionary |
+| 2026-10-11 | Danish spelling, round 2: Den Danske Ordbog lemmas (COR.EXT), Danish place and common person names (Wikidata), corpus word frequencies (CC0 Dynaword subsets) rank suggestions and catch typos that parse as compounds (*bøgerene*); false flags on held-out Danish Wikipedia 36.2 → 25.7 per 1,000 words; asset 1.1 MB |
+| 2026-10-11 | Danish split compounds (*tog station* → *togstation*) flagged as grammar, except pairs Danish text writes apart (*over for*, *lav et*) |
+| 2026-10-11 | Danish present tense after *at* or a modal verb (*at bliver*, *vil står*) flagged with the infinitive as fix; only forms that are never a noun or adverb |
 | 2026-10-11 | Move tracking (#400): `w:moveFrom`/`w:moveTo` and their named ranges kept in DOCX, a tracked cut and paste of a paragraph or sentence records a move, accept/reject at either end resolves both, green double strikethrough/underline and "Moved from/to" balloons |
 | 2026-10-11 | Footnote and Endnote dialog from the References › Footnotes launcher: options per section or document (below text, end of section, number format, start at, restart each section or page), custom marks, convert footnotes ↔ endnotes; kept in DOCX (#385) |
 | 2026-10-11 | Shape Format › Text: text direction, Align Text and linked text boxes (Create Link / Break Link), read and written in DOCX (#369) |
@@ -161,6 +165,9 @@ Ranked, to beta (detail and remaining milestones in [docs/roadmap.md](docs/roadm
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | trivial | Progress log: Danish split compounds and present tense after *at* |
+| 2026-10-11 | trivial | Progress log: Danish spelling, round 2 |
+| 2026-10-11 | trivial | Progress log: Danish spelling |
 | 2026-10-11 | trivial | Progress log: text direction, Align Text and linked text boxes (#369) |
 | 2026-10-10 | trivial | Progress: Drawing Canvas (#344): insert, shapes/pictures/text boxes inside, Fit/Expand/Scale, DOCX `wpc:wpc`, turns and flips as a whole; catalog 404/434 |
 | 2026-10-11 | trivial | Progress log: mail-merge recipients from .xlsx/.xlsm/.ods (#334) |

@@ -1,7 +1,7 @@
 //! References tab: table of contents, footnotes/endnotes, captions; field updates.
 
 use serde_json::{Value, json};
-use wordcraft_doc::para::{InlineObject, NoteKind};
+use wordcraft_doc::para::{InlineObject, NoteKind, OBJ};
 use wordcraft_doc::props::{CharProps, TabAlign, TabLeader, TabStop};
 use wordcraft_doc::{Block, Paragraph, PartKind, Path, Pos, StoryRef, para_block};
 
@@ -110,6 +110,38 @@ fn toc_range(s: &Session) -> Option<(usize, usize)> {
     Some((start, end))
 }
 
+/// A TOC imported as a range field (`FieldStart`…`FieldEnd`: one without a TOC heading, or with
+/// content around it the engine's TOC can't reproduce) becomes the engine's TOC before an update,
+/// so Update Table refreshes it rather than adding a second one: an empty `TOC` field where the
+/// range started, its old result gone, and the regenerated entries after that paragraph (text
+/// that followed the range moves below them). Only an unlocked, top-level TOC that isn't inside
+/// another range field, and only when the body has no engine TOC already.
+fn range_toc_to_field(s: &mut Session) -> Result<(), CmdError> {
+    if toc_range(s).is_some() {
+        return Ok(());
+    }
+    let is_toc = |instr: &str| instr.split_whitespace().next().is_some_and(|k| k.eq_ignore_ascii_case("TOC"));
+    let Some(r) = s
+        .doc
+        .field_ranges(StoryRef::Body)
+        .into_iter()
+        .find(|r| r.depth == 0 && !r.locked && is_toc(&r.instr) && r.start.path.depth() == 0 && r.end.path.depth() == 0)
+    else {
+        return Ok(());
+    };
+    let Some(after_end) = r.end.off.checked_add(OBJ.len_utf8()) else { return Ok(()) };
+    let end = Pos { off: after_end, ..r.end.clone() };
+    let props = s.doc.para_at(&r.start).map(|p| p.props_of_char(r.start.off).clone()).unwrap_or_default();
+    let at = s.doc.delete_range(&r.start, &end)?;
+    let field = InlineObject::Field { instr: r.instr.trim().to_string(), result: String::new(), locked: false, code: false };
+    let after = s.doc.insert_object(&at, field, &props)?;
+    if s.doc.para_at(&after).is_some_and(|p| after.off < p.len()) {
+        s.doc.split_paragraph(&after)?;
+    }
+    s.clamp_selection();
+    Ok(())
+}
+
 fn toc_levels(s: &Session, start: usize) -> u8 {
     s.doc
         .body
@@ -130,6 +162,7 @@ fn toc_levels(s: &Session, start: usize) -> u8 {
 }
 
 fn insert_toc(s: &mut Session, v: &Value) -> CmdResult {
+    range_toc_to_field(s)?;
     if toc_range(s).is_some() {
         update_toc(s)?;
         return sel_result(s);
@@ -155,6 +188,7 @@ fn insert_toc(s: &mut Session, v: &Value) -> CmdResult {
 
 /// Regenerate the TOC entries with page numbers (two layout passes: entries change pagination).
 pub fn update_toc(s: &mut Session) -> Result<(), CmdError> {
+    range_toc_to_field(s)?;
     let Some((start, end)) = toc_range(s) else { return Ok(()) };
     let levels = toc_levels(s, start);
     for i in (start + 1..=end).rev() {

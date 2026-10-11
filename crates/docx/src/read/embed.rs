@@ -31,7 +31,7 @@ impl Reader<'_> {
                 if ![&rel.kind, &rel.target].iter().all(|s| manifest_field_ok(s)) {
                     continue;
                 }
-                if !self.doc.sources.is_empty() && self.xml(&rel.target).ok().flatten().is_some_and(|r| r.name == "b:Sources") {
+                if !self.doc.sources.is_empty() && self.xml(&rel.target).ok().flatten().is_some_and(|r| r.local() == "Sources") {
                     continue;
                 }
                 if self.keep_part_tree(&rel.target) {

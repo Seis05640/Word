@@ -206,10 +206,33 @@ impl Writer<'_> {
         }
 
         let mut open_link: Option<String> = None;
+        // Inline content controls (`w:sdt`) nest as XML, but their markers are independent
+        // objects that edits can separate (delete one, split the paragraph). Keep the output
+        // well-formed: drop an end with no open start, close what's still open at paragraph end,
+        // and never open or close one inside a hyperlink (revision wrappers are per run).
+        let mut open_controls = 0usize;
         let mut i = 0;
         while i < pieces.len() {
             let Some((piece, props)) = pieces.get(i) else { break };
             let props: &CharProps = props;
+            if let Piece::Obj(o @ (InlineObject::ContentControlStart { .. } | InlineObject::ContentControlEnd)) = piece {
+                if open_link.take().is_some() {
+                    w.close("w:hyperlink");
+                }
+                match o {
+                    InlineObject::ContentControlStart { properties, end_properties } => {
+                        content_control_open(w, properties, end_properties);
+                        open_controls += 1;
+                    }
+                    _ if open_controls > 0 => {
+                        w.raw("</w:sdtContent></w:sdt>");
+                        open_controls -= 1;
+                    }
+                    _ => {}
+                }
+                i += 1;
+                continue;
+            }
             // Hyperlink grouping.
             if props.link != open_link {
                 if open_link.is_some() {
@@ -263,6 +286,9 @@ impl Writer<'_> {
         }
         if open_link.is_some() {
             w.close("w:hyperlink");
+        }
+        for _ in 0..open_controls {
+            w.raw("</w:sdtContent></w:sdt>");
         }
     }
 
@@ -378,6 +404,8 @@ impl Writer<'_> {
                 field_run(w, props, &|w| w.empty("w:fldChar", &[("w:fldCharType", "end")]));
                 self.rev_close(w, props);
             }
+            // Written (balanced) by `para_content`.
+            InlineObject::ContentControlStart { .. } | InlineObject::ContentControlEnd => {}
             InlineObject::NoteRef { kind, id, custom } => {
                 let foot = *kind == NoteKind::Footnote;
                 if self.current_note == Some((foot, *id)) {
@@ -1249,6 +1277,22 @@ pub(super) fn spin_attrs(spin: wordcraft_geom::Spin) -> Vec<(&'static str, Strin
 }
 
 /// One `w:r` with `props`, holding what `f` writes (a field character or code).
+/// `<w:sdt>`, its properties and `<w:sdtContent>`. The properties are XML re-serialized by the
+/// reader; anything that isn't a whole `w:sdtPr`/`w:sdtEndPr` element is left out.
+fn content_control_open(w: &mut W, properties: &str, end_properties: &str) {
+    w.raw("<w:sdt>");
+    let whole = |xml: &str, tag: &str| xml.starts_with(tag) && crate::xml::parse(format!("<x>{xml}</x>").as_bytes()).is_ok();
+    if whole(properties, "<w:sdtPr") {
+        w.raw(properties);
+    } else {
+        w.raw("<w:sdtPr/>");
+    }
+    if whole(end_properties, "<w:sdtEndPr") {
+        w.raw(end_properties);
+    }
+    w.raw("<w:sdtContent>");
+}
+
 fn field_run(w: &mut W, props: &CharProps, f: &dyn Fn(&mut W)) {
     w.open("w:r", &[]);
     rpr(w, props);

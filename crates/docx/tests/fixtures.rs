@@ -96,7 +96,9 @@ fn hyperlink_runs_and_wrappers() {
     let bytes = docx(body, &[("rId5", "hyperlink", "https://example.org/")], &[]);
     let d = wordcraft_docx::read(&bytes).unwrap();
     let p = paras(&d);
-    assert_eq!(p[0].text, "siteXABC\u{F04A}\u{2011}\u{AD}\n\u{C}\u{E} e&T");
+    // The inline content control keeps start and end markers (object characters) around "C".
+    let obj = wordcraft_doc::para::OBJ;
+    assert_eq!(p[0].text, format!("siteXAB{obj}C{obj}\u{F04A}\u{2011}\u{AD}\n\u{C}\u{E} e&T"));
     assert_eq!(p[0].props_of_char(0).link.as_deref(), Some("https://example.org/"));
     assert_eq!(p[0].props_of_char(0).style.as_deref(), Some("Hyperlink"));
     assert_eq!(p[0].props_of_char(4).link.as_deref(), Some("https://example.org/#frag"));
@@ -131,6 +133,125 @@ fn alternate_content_choice_and_fallback() {
         o => panic!("{o:?}"),
     }
     assert_eq!(p[1].text, "fallback text");
+}
+
+#[test]
+fn inline_content_control_properties_survive_round_trip() {
+    let body = r#"
+<w:p><w:r><w:t>before </w:t></w:r>
+ <w:sdt><w:sdtPr><w:alias w:val="Customer name"/><w:tag w:val="customer.name"/><w:id w:val="42"/><w:lock w:val="sdtContentLocked"/><w:dataBinding w:storeItemID="{12345678-1234-1234-1234-123456789ABC}" w:xpath="/customer/name" w:prefixMappings=""/></w:sdtPr><w:sdtEndPr><w:rPr><w:i/></w:rPr></w:sdtEndPr><w:sdtContent><w:r><w:rPr><w:b/></w:rPr><w:t>Jordan</w:t></w:r></w:sdtContent></w:sdt>
+ <w:r><w:t xml:space="preserve"> after</w:t></w:r></w:p>"#;
+    let original = read_body(body);
+    let original_para = paras(&original)[0];
+    assert_eq!(original_para.plain_text(), "before Jordan after");
+    let text_offset = original_para.text.find("Jordan").unwrap();
+    assert_eq!(original_para.props_of_char(text_offset).bold, Some(true));
+
+    let written = wordcraft_docx::write(&original).unwrap();
+    let document_xml = text(&unzip(&written), "word/document.xml");
+    assert!(document_xml.contains("<w:sdtPr>"), "{document_xml}");
+    assert!(document_xml.contains("<w:alias w:val=\"Customer name\"/>"), "{document_xml}");
+    assert!(document_xml.contains("<w:tag w:val=\"customer.name\"/>"), "{document_xml}");
+    assert!(document_xml.contains("<w:lock w:val=\"sdtContentLocked\"/>"), "{document_xml}");
+    assert!(document_xml.contains("w:xpath=\"/customer/name\""), "{document_xml}");
+    assert!(document_xml.contains("<w:sdtEndPr><w:rPr><w:i/></w:rPr></w:sdtEndPr>"), "{document_xml}");
+
+    let round_trip = wordcraft_docx::read(&written).unwrap();
+    let round_trip_para = paras(&round_trip)[0];
+    assert_eq!(round_trip_para.plain_text(), "before Jordan after");
+    let text_offset = round_trip_para.text.find("Jordan").unwrap();
+    assert_eq!(round_trip_para.props_of_char(text_offset).bold, Some(true));
+}
+
+/// `document.xml` of `d` once written, asserting it's well-formed XML (every tag closed in order).
+fn written_well_formed(d: &Document) -> String {
+    let xml = text(&unzip(&wordcraft_docx::write(d).unwrap()), "word/document.xml");
+    let mut r = quick_xml::Reader::from_str(&xml);
+    let mut depth = 0i64;
+    loop {
+        match r.read_event() {
+            Ok(quick_xml::events::Event::Start(_)) => depth += 1,
+            Ok(quick_xml::events::Event::End(_)) => depth -= 1,
+            Ok(quick_xml::events::Event::Eof) => break,
+            Ok(_) => {}
+            Err(e) => panic!("malformed document.xml ({e}): {xml}"),
+        }
+    }
+    assert_eq!(depth, 0, "unbalanced document.xml: {xml}");
+    assert_eq!(xml.matches("<w:sdt>").count(), xml.matches("</w:sdt>").count(), "{xml}");
+    xml
+}
+
+const CONTROL_PARA: &str = r#"<w:p><w:r><w:t xml:space="preserve">before </w:t></w:r><w:sdt><w:sdtPr><w:alias w:val="Name"/></w:sdtPr><w:sdtContent><w:r><w:t>Jordan</w:t></w:r></w:sdtContent></w:sdt><w:r><w:t xml:space="preserve"> after</w:t></w:r></w:p>"#;
+
+fn para_mut(d: &mut Document, i: usize) -> &mut Paragraph {
+    match std::sync::Arc::make_mut(d.body.get_mut(i).unwrap()) {
+        Block::Para(p) => p,
+        _ => panic!("block {i} is not a paragraph"),
+    }
+}
+
+#[test]
+fn content_control_with_one_marker_deleted_writes_well_formed_xml() {
+    let obj = wordcraft_doc::para::OBJ.len_utf8();
+    for which in 0..2 {
+        let mut d = read_body(CONTROL_PARA);
+        let p = para_mut(&mut d, 0);
+        let offs = p.object_offsets();
+        assert_eq!(offs.len(), 2, "start and end markers");
+        let at = offs[which];
+        p.delete(at, at + obj).unwrap();
+        let xml = written_well_formed(&d);
+        assert!(xml.contains("Jordan"), "{xml}");
+        // A lone start is closed at the paragraph end; a lone end is dropped.
+        assert_eq!(xml.matches("<w:sdt>").count(), usize::from(which == 1), "{xml}");
+    }
+}
+
+#[test]
+fn enter_inside_a_content_control_writes_well_formed_xml() {
+    let mut d = read_body(CONTROL_PARA);
+    let at = paras(&d)[0].text.find("Jor").unwrap() + "Jor".len();
+    d.split_paragraph(&wordcraft_doc::Pos::body(0, at)).unwrap();
+    assert_eq!(paras(&d).len(), 2);
+    let xml = written_well_formed(&d);
+    assert!(xml.contains("<w:alias w:val=\"Name\"/>"), "{xml}");
+    let back = wordcraft_docx::read(&wordcraft_docx::write(&d).unwrap()).unwrap();
+    let texts: Vec<String> = paras(&back).iter().map(|p| p.plain_text()).collect();
+    assert_eq!(texts, ["before Jor", "dan after"]);
+}
+
+#[test]
+fn content_control_overlapping_a_hyperlink_writes_well_formed_xml() {
+    // The control starts inside a link and ends outside it, and the reverse.
+    let mut d = read_body(CONTROL_PARA);
+    let p = para_mut(&mut d, 0);
+    let a = p.text.find("before").unwrap() + 3;
+    let b = p.text.find("Jordan").unwrap() + 3;
+    p.format(a, b, &|c| c.link = Some("https://example.com/".into())).unwrap();
+    let c = p.text.find("after").unwrap() + 2;
+    p.format(b + 1, c, &|c| c.link = Some("#here".into())).unwrap();
+    let xml = written_well_formed(&d);
+    assert!(xml.contains("<w:hyperlink"), "{xml}");
+    let back = wordcraft_docx::read(&wordcraft_docx::write(&d).unwrap()).unwrap();
+    assert_eq!(paras(&back)[0].plain_text(), "before Jordan after");
+}
+
+#[test]
+fn content_control_crossing_a_tracked_insert_writes_well_formed_xml() {
+    let body = r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t xml:space="preserve">new </w:t></w:r><w:sdt><w:sdtPr><w:tag w:val="t"/></w:sdtPr><w:sdtContent><w:r><w:t>Jor</w:t></w:r></w:sdtContent></w:sdt></w:ins><w:sdt><w:sdtPr/><w:sdtContent><w:ins w:id="2" w:author="A"><w:r><w:t>dan</w:t></w:r></w:ins><w:r><w:t xml:space="preserve"> old</w:t></w:r></w:sdtContent></w:sdt></w:p>"#;
+    let mut d = read_body(body);
+    // Track an insert that spans a control boundary too.
+    let p = para_mut(&mut d, 0);
+    let ins = p.props_of_char(0).ins;
+    assert!(ins.is_some());
+    let end = p.text.len();
+    p.format(0, end, &|c| c.ins = ins).unwrap();
+    let xml = written_well_formed(&d);
+    assert!(xml.contains("<w:ins "), "{xml}");
+    assert!(xml.contains("<w:tag w:val=\"t\"/>"), "{xml}");
+    let back = wordcraft_docx::read(&wordcraft_docx::write(&d).unwrap()).unwrap();
+    assert_eq!(paras(&back)[0].plain_text(), "new Jordan old");
 }
 
 #[test]

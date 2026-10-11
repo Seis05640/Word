@@ -12,7 +12,10 @@ pub(super) fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
         Err(e) if e.kind() == io::ErrorKind::NotFound => None,
         Err(e) => return Err(e),
     };
-    replace_with(path, |file| {
+    // A new document gets the usual mode (0666 less the umask); a replaced one keeps its own,
+    // and its temporary file stays private until that mode is applied.
+    let private = permissions.is_some();
+    replace_with(path, private, |file| {
         file.write_all(bytes)?;
         if let Some(permissions) = permissions {
             file.set_permissions(permissions)?;
@@ -23,8 +26,8 @@ pub(super) fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     })
 }
 
-fn replace_with(path: &Path, prepare: impl FnOnce(&mut File) -> io::Result<()>) -> io::Result<()> {
-    let mut temp = Temporary::create(path)?;
+fn replace_with(path: &Path, private: bool, prepare: impl FnOnce(&mut File) -> io::Result<()>) -> io::Result<()> {
+    let mut temp = Temporary::create(path, private)?;
     prepare(temp.file()?)?;
     temp.commit(path)
 }
@@ -36,7 +39,9 @@ struct Temporary {
 }
 
 impl Temporary {
-    fn create(destination: &Path) -> io::Result<Self> {
+    /// `private`: create the file readable by its owner only (0600) rather than with the default
+    /// mode (0666 less the umask).
+    fn create(destination: &Path, private: bool) -> io::Result<Self> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         if destination.file_name().is_none() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "save destination needs a file name"));
@@ -48,10 +53,12 @@ impl Temporary {
             let mut options = OpenOptions::new();
             options.write(true).create_new(true);
             #[cfg(unix)]
-            {
+            if private {
                 use std::os::unix::fs::OpenOptionsExt;
                 options.mode(0o600);
             }
+            #[cfg(not(unix))]
+            let _ = private;
             match options.open(&path) {
                 Ok(file) => return Ok(Self { path, file: Some(file), committed: false }),
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
@@ -114,7 +121,7 @@ mod tests {
             let d = Scratch::new();
             let path = d.target();
             fs::write(&path, b"Original bytes.").unwrap();
-            let err = replace_with(&path, |file| {
+            let err = replace_with(&path, true, |file| {
                 file.write_all(if partial { b"Partial" } else { b"Complete replacement bytes." })?;
                 Err(io::Error::other("injected preparation failure"))
             })
@@ -130,8 +137,8 @@ mod tests {
         let d = Scratch::new();
         let path = d.target();
         fs::write(&path, b"Original bytes.").unwrap();
-        let mut first = Temporary::create(&path).unwrap();
-        let mut second = Temporary::create(&path).unwrap();
+        let mut first = Temporary::create(&path, true).unwrap();
+        let mut second = Temporary::create(&path, true).unwrap();
         assert_ne!(first.path, second.path);
         first.file().unwrap().write_all(b"First complete save.").unwrap();
         second.file().unwrap().write_all(b"Second complete save.").unwrap();
@@ -150,7 +157,26 @@ mod tests {
     fn new_temporary_files_are_private_until_prepared() {
         use std::os::unix::fs::PermissionsExt;
         let d = Scratch::new();
-        let temp = Temporary::create(&d.target()).unwrap();
+        let temp = Temporary::create(&d.target(), true).unwrap();
         assert_eq!(fs::metadata(&temp.path).unwrap().permissions().mode() & 0o777, 0o600);
+    }
+
+    /// A new document gets the default mode, as `fs::write` would give it — not 0600; a replaced
+    /// document keeps its own mode.
+    #[cfg(unix)]
+    #[test]
+    fn new_documents_get_the_default_mode_and_replaced_ones_keep_theirs() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = Scratch::new();
+        let reference = d.0.join("reference.docx");
+        fs::write(&reference, b"x").unwrap();
+        let default_mode = fs::metadata(&reference).unwrap().permissions().mode() & 0o777;
+        let path = d.target();
+        write(&path, b"New document.").unwrap();
+        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, default_mode);
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
+        write(&path, b"Saved again.").unwrap();
+        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o640);
+        assert_eq!(fs::read(&path).unwrap(), b"Saved again.");
     }
 }

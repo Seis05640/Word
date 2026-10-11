@@ -210,21 +210,32 @@ pub fn symbol_font_char(family: &str, c: char) -> Option<char> {
 /// processors measure single line spacing (OS/2 usWinAscent/usWinDescent, falling back to the
 /// hhea values plus line gap).
 pub fn line_metrics(face: &crate::FontFace) -> (f64, f64) {
-    static CACHE: OnceLock<Mutex<HashMap<u32, (f64, f64)>>> = OnceLock::new();
+    let (ascent, descent, _) = cached_line_metrics(face);
+    (ascent, descent)
+}
+
+/// List-label ascent includes the full positive hhea line gap. Controlled Word for Mac
+/// probes with Apple Symbols distinguish this from the text metrics' half-gap split.
+pub fn label_ascent(face: &crate::FontFace) -> f64 {
+    cached_line_metrics(face).2
+}
+
+fn cached_line_metrics(face: &crate::FontFace) -> (f64, f64, f64) {
+    static CACHE: OnceLock<Mutex<HashMap<u32, (f64, f64, f64)>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     if let Some(v) = cache.lock().unwrap_or_else(|e| e.into_inner()).get(&face.id()) {
         return *v;
     }
-    let mut v = (face.ascent.max(1.0), face.descent.abs());
+    let mut v = (face.ascent.max(1.0), face.descent.abs(), face.ascent.max(1.0));
     if let Some(f) = face.skrifa() {
         // hhea ascender + descender + line gap (Word on macOS); OS/2 win metrics only when the
         // hhea values are missing, and never more than twice the em.
         let hhea = f.hhea().ok().map(|h| {
             let gap = h.line_gap().to_i16().max(0) as f64;
-            (h.ascender().to_i16() as f64 + gap / 2.0, (h.descender().to_i16() as f64).abs() + gap / 2.0)
+            (h.ascender().to_i16() as f64 + gap / 2.0, (h.descender().to_i16() as f64).abs() + gap / 2.0, h.ascender().to_i16() as f64 + gap)
         });
-        let win = f.os2().ok().map(|o| (o.us_win_ascent() as f64, o.us_win_descent() as f64));
-        let ok = |m: &(f64, f64)| m.0 > 0.0 && m.0 + m.1 <= face.upem * 2.0;
+        let win = f.os2().ok().map(|o| (o.us_win_ascent() as f64, o.us_win_descent() as f64, o.us_win_ascent() as f64));
+        let ok = |m: &(f64, f64, f64)| m.0 > 0.0 && m.0 + m.1 <= face.upem * 2.0;
         if let Some(m) = hhea.filter(ok) {
             v = m;
         } else if let Some(m) = win.filter(ok) {

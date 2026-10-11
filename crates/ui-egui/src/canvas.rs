@@ -73,6 +73,10 @@ pub struct CanvasState {
     pub table_tool: Option<crate::table_pen::TableTool>,
     /// The Draw Table stroke (or eraser press) in progress.
     pub(crate) table_stroke: Option<crate::table_pen::PenStroke>,
+    /// The shape tool is armed (`shape_tool`): drag to draw on page.
+    pub shape_tool: Option<wordcraft_doc::para::ShapeKind>,
+    /// Shape drag in progress.
+    pub(crate) shape_drawing: Option<crate::shape_tool::ShapeDrawing>,
 }
 
 impl CanvasState {
@@ -120,6 +124,8 @@ impl Default for CanvasState {
             balloon_rects: Vec::new(),
             table_tool: None,
             table_stroke: None,
+            shape_tool: None,
+            shape_drawing: None,
         }
     }
 }
@@ -651,6 +657,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         crate::objects::paint(app, &painter, &t, &layout, &rects, geo.scale);
         crate::ink::paint(app, &painter, &rects, &layout, geo.scale);
         crate::table_pen::paint(app, &painter, &t, &layout, &rects, geo.scale);
+        crate::shape_tool::paint(app, &painter, &t, &layout, &rects, geo.scale);
         (resp, rects)
     });
     app.canvas.scroll_offset = out.state.offset;
@@ -671,8 +678,10 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         });
     }
     app.canvas.focused = resp.has_focus();
-    // Draw Table / Eraser own the mouse while on (no caret moves); else the usual editing.
-    if !crate::table_pen::pointer(app, ui, &resp, &rects, &layout, geo.scale) {
+    // Draw Table / Eraser / Shape tool own the mouse while on (no caret moves); else the usual editing.
+    if !crate::table_pen::pointer(app, ui, &resp, &rects, &layout, geo.scale)
+        && !crate::shape_tool::pointer(app, ui, &resp, &rects, &layout, geo.scale)
+    {
         mouse(app, ui, &resp, &rects, &layout, geo.scale);
     }
     // Right-click: move the caret there (unless inside the selection), then the context menu.
@@ -716,6 +725,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         ui.ctx().set_cursor_icon(over_object.unwrap_or(egui::CursorIcon::Text));
     }
     crate::table_pen::cursor(app, ui, &resp);
+    crate::shape_tool::cursor(app, ui, &resp);
     // While "Save changes?" is up, keys answer it rather than edit the document behind it.
     if app.canvas.focused && !matches!(app.dialog, Some(crate::dialogs::Dialog::SaveChanges { .. })) {
         crate::keys::canvas_events(app, ui.ctx());

@@ -1,6 +1,6 @@
 # UI parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** trivial (table borders and the resize handle drag on the page, #217; previously trivial: shortcuts: Move Paragraph Up/Down, Promote/Demote, Go Back, Alt+X, #343) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** trivial (table selection areas, insert buttons, move handle and double-click AutoFit on the page; previously trivial: table borders and the resize handle drag on the page, #217; previously trivial: shortcuts: Move Paragraph Up/Down, Promote/Demote, Go Back, Alt+X, #343) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 How WordCraft looks and feels next to Word: ribbon, dialogs, panes, keyboard, mouse and touch.
 Typing behaviour has its own checklist ([`typing-parity.md`](typing-parity.md)). All assets are our
@@ -22,7 +22,7 @@ own (`AGENTS.md`: no Microsoft iconography, ever).
 | Backstage (Home, New, Open, Info, Save As, Print, Share, Export, Options) | Home and New separate (#254), Info properties kept (#268) | | 68% | 4–6 |
 | Rulers: indents, tabs, margins, table columns | indents draggable (one undo, #62); tabs; table column drag pending (#49) | ✅ | 70% | 2–3 |
 | On-canvas objects: select, drag, resize handles, nudge | ✅ tested (#228) | ✅ | 75% | — |
-| Tables on the page: drag column and row borders, resize handle past the bottom-right corner | ✅ resize cursors, dashed guide, one undo step per drag, selection kept; Shift moves one column; Esc cancels (#217). Missing: Ctrl and Alt drags, the left edge, borders of selected cells only, double-click AutoFit | ✅ | 80% | 1–2 |
+| Tables on the page: drag column and row borders, resize handle past the bottom-right corner; select columns, rows and cells; "+" insert buttons; move handle | ✅ resize cursors, dashed guide, one undo step per drag, selection kept; Shift moves one column; Esc cancels (#217); double-click a column border to AutoFit it; selection arrows above a column, left of a row and along a cell's left edge (a drag selects more; the cells are shaded and a column is edited cell by cell); "+" left of a row border and above a column border; move handle past the top-left corner (a click selects the table, a drag floats it where it's dropped). Missing: Ctrl and Alt drags, the left edge, borders of selected cells only, Shift+click to extend a cell selection | ✅ | 90% | 1–2 |
 | Rotation handle, crop handles on canvas, alignment guides, smart guides | rotation handle (Shift: 15° steps), turned frames resize along their axes (#332); crop handles and guides missing | ✅ | 25% | 3–5 |
 | Selection: word/sentence/paragraph clicks, Shift extend, F8 extend mode, column (Alt+drag, #237) | ✅ | ✅ | 85% | 1 |
 | Zoom: Ctrl+scroll, pinch (#179), zoom buttons (#232), pages side by side when zoomed out (#251) | ✅ | ✅ | 85% | — |
@@ -42,6 +42,7 @@ own (`AGENTS.md`: no Microsoft iconography, ever).
 | 2026-10-11 | minor | Keyboard shortcuts 101 → 125 commands (#330): Reset Paragraph/Character Formatting, symbols, DATE/TIME/PAGE fields, view switches, Word Count, mail merge, F4 Repeat now reachable |
 | 2026-10-11 | trivial | Collapsed duplicate rows left by parallel merges |
 | 2026-10-11 | trivial | Dialogs keep their top edge in place when switching tabs (Paragraph, Font, Borders and Shading…): only the bottom edge moves (#507) |
+| 2026-10-11 | trivial | Tables on the page: selection areas for columns, rows and cells, "+" insert buttons, the move handle and double-click AutoFit; Select Column in the ribbon |
 | 2026-10-11 | trivial | Tables on the page: column and row borders and the resize handle drag, with a dashed guide and one undo step per drag (#217) |
 | 2026-10-11 | trivial | Interface size setting in File › Options › General (80–200 %), kept between runs and applied on top of the system's display scale; `ui.interfaceSize` for agents (#475) |
 | 2026-10-11 | trivial | Font box (ribbon and mini toolbar): typing lists the matching fonts (prefix first, then any part of the name); Up/Down, Enter or a click picks one, Escape cancels (#359) |

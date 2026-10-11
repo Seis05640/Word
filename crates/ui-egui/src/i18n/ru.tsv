@@ -1749,3 +1749,8 @@ preview	Title	Пример
 	Keyboard shortcuts:	Сочетания клавиш:
 	Customize…	Настроить…
 	Resize Table by Dragging	Изменить размер таблицы перетаскиванием
+	Select Column	Выделить столбец таблицы
+	Select Table Cells by Clicking	Выделить ячейки таблицы щелчком
+	Insert Row or Column by Clicking	Вставить строку или столбец щелчком
+	Move Table by Dragging	Переместить таблицу перетаскиванием
+	AutoFit Column by Double-Clicking	Автоподбор ширины столбца двойным щелчком

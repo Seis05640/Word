@@ -22,7 +22,7 @@ use serde_json::Value;
 
 pub use io::Password;
 pub use keymap::KeyMap;
-pub use session::{ColumnBlock, EditSnapshot, FindState, MathEdit, Prefs, Selection, Session, ViewState};
+pub use session::{CellRange, ColumnBlock, EditSnapshot, FindState, MathEdit, Prefs, Selection, Session, ViewState};
 pub use wordcraft_doc as doc;
 pub use wordcraft_layout as layout;
 pub use wordcraft_render as render;

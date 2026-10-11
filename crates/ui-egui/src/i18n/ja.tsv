@@ -1357,3 +1357,8 @@
 	Keyboard shortcuts:	キーボード ショートカット:
 	Customize…	ユーザー設定…
 	Resize Table by Dragging	ドラッグで表のサイズを変更
+	Select Column	列の選択
+	Select Table Cells by Clicking	クリックで表のセルを選択
+	Insert Row or Column by Clicking	クリックで行または列を挿入
+	Move Table by Dragging	ドラッグで表を移動
+	AutoFit Column by Double-Clicking	ダブルクリックで列の幅を自動調整

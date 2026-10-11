@@ -1367,3 +1367,8 @@
 	Remove every custom shortcut and restore the built-in keys?	Kas eemaldada kõik kohandatud kiirklahvid ja taastada sisseehitatud klahvid?
 	Reset All…	Lähtesta kõik…
 	Resize Table by Dragging	Tabeli suuruse muutmine lohistades
+	Select Column	Vali veerg
+	Select Table Cells by Clicking	Tabelilahtrite valimine klõpsates
+	Insert Row or Column by Clicking	Rea või veeru lisamine klõpsates
+	Move Table by Dragging	Tabeli teisaldamine lohistades
+	AutoFit Column by Double-Clicking	Veeru automaatne sobitus topeltklõpsuga

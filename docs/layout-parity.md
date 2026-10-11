@@ -1,6 +1,6 @@
 # Layout and pagination parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (first version; line breaking, pagination and object placement checked against Word's behaviour from the layout source on origin/main) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-11 · **Change:** trivial (legacy table contextual spacing measured and supported) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4; this spacing comparison used 16.113.3
 
 A document only "opens correctly" if its pages break where Word breaks them: the same lines, the
 same page count, footnotes and pictures on the same pages. This checklist covers line breaking,
@@ -52,8 +52,34 @@ font can't match Word's metrics.
 | Equations: display layout, numbering, wrapping long display equations | ✅ | #191; long display equations break at top-level operators (`m:brkBin`, `m:brkBinSub`), manual breaks and `m:alnAt`, continuation lines indented by `m:wrapIndent` or set right (`m:wrapRight`) (#326) | — |
 | Hidden text excluded from breaking and hyphenation | ✅ | #173 | — |
 | Fields: PAGE, NUMPAGES, SECTIONPAGES, TOC page numbers | ✅ | #52 | — |
-| Compatibility modes (Word 2003/2007/2010 layout for old files: `w:compat` options) | 🟡 | mode 15 behaviour; the ~60 legacy compat options are mostly ignored | 10–20 |
+| Compatibility modes (Word 2003/2007/2010 layout for old files: `w:compat` options) | 🟡 | `allowSpaceOfSameStyleInTable` supported in modes 11/12/14; mode 15 retains contextual suppression. Most other legacy compat options remain ignored | 10–20 |
 | Page-by-page comparison harness against Word | ❌ | Run Word locally on our own synthetic documents, export PDF, compare line breaks; Word output stays under `plan/` (never committed) | 8–12 |
+
+## Legacy table contextual spacing
+
+Observed in Word for Mac 16.113.3 (build 26092714) on macOS 26.6.2, using
+original synthetic DOCX files, Roboto Regular 12 pt, exactly 24 pt lines, equal paragraph
+styles, both paragraphs contextual, first paragraph after-space 12 pt and before-space 0 pt.
+The one-cell table had no borders or cell margins. Baseline separation was 36 pt with
+`w:allowSpaceOfSameStyleInTable` enabled in compatibility modes 11, 12 and 14, versus
+24 pt with it disabled. Mode 15 measured 24 pt in either state. Body and header controls
+in modes 14 and 15 measured 24 pt with the flag enabled. Comparison tolerance: 0.25 pt.
+
+The model and DOCX reader/writer preserve the flag. Cell layout bypasses contextual
+suppression only for enabled modes 11/12/14, including cells without table-style formatting.
+Tests: `legacy_table_contextual_spacing_flag_keeps_after_space` and
+`legacy_table_contextual_spacing_flag_is_scoped_to_cells_and_legacy_mode`.
+WordCraft original-open and save/reopen measurements match all 12 controls; reopening
+its saved DOCX files in Word retains the same gaps. Word-derived exports stay local under
+ignored `plan/word/`; no Word-generated fixture is committed.
+
+The [published option](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.allowspaceofsamestyleintable?view=openxml-3.0.1)
+specifies an override inside tables. Its mode 15 exception is not explained by that source;
+the guard follows this observation. [MS-DOCX compatibilityMode](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-docx/90138c4d-eb18-4edc-aa6c-dfb799cb1d0d)
+allows 11, 12, 14 and 15. Mode 13 is invalid and Word rejected its synthetic input.
+Ordinary overlapping before/after space and one-sided contextual spacing remain separate
+work in #108 and #568. Nested tables, rotated cells, other fonts and Word for Windows
+were not reference-tested here. This closes one compatibility-option gap, not table parity.
 
 ## Performance
 
@@ -68,6 +94,7 @@ font can't match Word's metrics.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | trivial | Legacy table contextual spacing measured and supported; modes 11/12/14 versus 15 checked with original synthetic documents |
 | 2026-10-11 | trivial | Group and Ungroup keep turned members' orientation and placement (#441, #443); Size resizes a group (#442); the eraser hits turned ink where it is drawn (#445) |
 | 2026-10-10 | trivial | Long footnotes continue onto the next page with a continuation separator (#352) |
 | 2026-10-10 | trivial | Rotated and flipped objects laid out and drawn (#332) |

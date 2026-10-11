@@ -662,6 +662,7 @@ impl Reader<'_> {
         for k in root.els() {
             match k.name.as_str() {
                 "w:compat" => {
+                    s.allow_space_of_same_style_in_table = k.child("w:allowSpaceOfSameStyleInTable").is_some_and(on_off);
                     // Only Word's own setting: another `w:uri` names a different application's.
                     let mode = k
                         .children("w:compatSetting")

@@ -1,6 +1,6 @@
 # Layout and pagination parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (first version; line breaking, pagination and object placement checked against Word's behaviour from the layout source on origin/main) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-11 · **Change:** minor (contextual paragraph spacing measured and corrected in body paragraphs and headers) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 A document only "opens correctly" if its pages break where Word breaks them: the same lines, the
 same page count, footnotes and pictures on the same pages. This checklist covers line breaking,
@@ -23,7 +23,7 @@ font can't match Word's metrics.
 | Kashida justification (Arabic) | ❌ | no kashida in `crates/layout` | 3–5 |
 | Distributed / Thai distributed alignment | 🟡 | read; layout untested | 1–2 |
 | Default font metrics (Aptos, Calibri, Cambria…) | 🟡 | Carlito/Caladea/Liberation are metric-compatible for Calibri/Cambria/Arial/Times/Courier; **Aptos (Word's default since 2024) has no metric-compatible open substitute**, so new Word documents wrap differently ([typing-parity.md](typing-parity.md) Known gaps). Needs an owner decision (commission or license a metric-matched font) | 6–10 + owner |
-| Line spacing (single, 1.5, double, at least, exactly, multiple), spacing before/after, contextual spacing | 🟡 | Word puts multiple-spacing extra below the text and collapses spacing differently (#135, #108 open) | 3–5 |
+| Line spacing (single, 1.5, double, at least, exactly, multiple), spacing before/after, contextual spacing | 🟡 | Contextual spacing measured in body paragraphs and headers (below); ordinary overlap and multiple-spacing differences remain (#108, #135 open) | 3–5 |
 | Widow/orphan control, keep with next, keep lines together, page break before | ✅ | `lib.rs` keep_next/keep_lines | — |
 | Tabs (left, center, right, decimal, bar), leaders | 🟡 | Bar tabs untested | 1–2 |
 | Hyphenation (automatic, 0.25" zone, soft hyphens, consecutive limit) | 🟡 | English patterns only; other languages hyphenate wrongly or not at all | in localization |
@@ -55,6 +55,29 @@ font can't match Word's metrics.
 | Compatibility modes (Word 2003/2007/2010 layout for old files: `w:compat` options) | 🟡 | mode 15 behaviour; the ~60 legacy compat options are mostly ignored | 10–20 |
 | Page-by-page comparison harness against Word | ❌ | Run Word locally on our own synthetic documents, export PDF, compare line breaks; Word output stays under `plan/` (never committed) | 8–12 |
 
+## Contextual paragraph spacing
+
+**Observed, 2026-10-11:** original synthetic DOCX probes in Word for Mac 16.113.3
+(build 26092714), compatibility mode 15, Roboto Regular 12 pt, Exactly 24 pt line
+spacing. With identical paragraph style IDs and contextual spacing enabled only
+on the first paragraph, 12 pt after / 8 pt before adds 0 pt to baseline separation;
+10 pt after / 12 pt before adds 1.92 pt, within the predeclared 0.25 pt tolerance
+of 2 pt. Body paragraphs and headers give the same results. Enabling only the
+second paragraph preserves the first paragraph's 12 pt after-space.
+
+The first-only residual agrees with the worked example in
+[ISO/IEC 29500-1 §17.3.1.9](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.contextualspacing?view=openxml-3.0.1).
+`contextual_after_removes_a_smaller_before_gap`,
+`contextual_after_keeps_only_the_residual_before_gap`, and
+`contextual_spacing_preserves_each_side_and_style_identity` pin those relative
+gaps and controls in body and header layout. Different style IDs retain their
+spacing even when their definitions are identical.
+
+This fixes contextual suppression in `place_para` and `layout_box`. Ordinary
+before/after overlap still needs #108; the uniform first-baseline offset, page
+boundaries, tables, text boxes and notes were not compared with Word in this study.
+No overall parity estimate changes from these probes.
+
 ## Performance
 
 | Measure | WordCraft | Word | Kind |
@@ -68,6 +91,7 @@ font can't match Word's metrics.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | minor | Body/header contextual spacing corrected from original Word probes; ordinary overlap remains #108 |
 | 2026-10-11 | trivial | Group and Ungroup keep turned members' orientation and placement (#441, #443); Size resizes a group (#442); the eraser hits turned ink where it is drawn (#445) |
 | 2026-10-10 | trivial | Long footnotes continue onto the next page with a continuation separator (#352) |
 | 2026-10-10 | trivial | Rotated and flipped objects laid out and drawn (#332) |

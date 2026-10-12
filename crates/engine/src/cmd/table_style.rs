@@ -62,11 +62,17 @@ fn build_new(s: &Session, v: &Value) -> Result<Style, CmdError> {
     if s.doc.styles.find(&name).is_some() {
         return Err(CmdError::Failed(format!("a style named `{name}` already exists")));
     }
+    let id = s.doc.styles.new_id(&name);
     let based_on = match p::str(v, "basedOn") {
-        Some(b) => Some(table_style_id(s, b).ok_or_else(|| CmdError::Params(format!("no table style `{b}`")))?),
+        Some(b) => {
+            let b_id = table_style_id(s, b).ok_or_else(|| CmdError::Params(format!("no table style `{b}`")))?;
+            if s.doc.styles.causes_cycle(&id, &b_id) {
+                return Err(CmdError::Params("circular style inheritance (basedOn cycle)".into()));
+            }
+            Some(b_id)
+        }
         None => table_style_id(s, "TableGrid").or_else(|| table_style_id(s, "TableNormal")),
     };
-    let id = s.doc.styles.new_id(&name);
     let mut st = Style { id, name, kind: StyleKind::Table, based_on, priority: Some(99), ..Default::default() };
     edit(&mut st, v)?;
     Ok(st)

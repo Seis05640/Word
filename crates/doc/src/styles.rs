@@ -444,6 +444,13 @@ impl StyleSheet {
         out.reverse();
         out
     }
+    /// Whether setting `id` to be based on `based_on` would create an inheritance cycle.
+    pub fn causes_cycle(&self, id: &str, based_on: &str) -> bool {
+        if id == based_on {
+            return true;
+        }
+        self.chain(based_on).iter().any(|s| s.id == id)
+    }
     /// Table style `id` with its based-on chain merged, base styles first (`None` when there is no
     /// such table style). Styles of other kinds in the chain are skipped.
     pub fn table_style(&self, id: &str) -> Option<TableStyleProps> {
@@ -463,8 +470,13 @@ impl StyleSheet {
         out.chr.style = None;
         Some(out)
     }
-    /// Add or replace a style.
-    pub fn upsert(&mut self, st: Style) {
+    /// Add or replace a style. Breaks circular `based_on` references if detected.
+    pub fn upsert(&mut self, mut st: Style) {
+        if let Some(ref b) = st.based_on {
+            if self.causes_cycle(&st.id, b) {
+                st.based_on = None;
+            }
+        }
         match self.styles.iter_mut().find(|s| s.id == st.id) {
             Some(s) => *s = st,
             None => self.styles.push(st),
@@ -655,5 +667,18 @@ mod tests {
         assert_eq!(s.new_id("My Style"), "MyStyle");
         assert_eq!(s.new_id("Normal"), "Normal1");
         assert_eq!(s.new_id("!!!"), "Style");
+    }
+
+    #[test]
+    fn style_cycle_prevention() {
+        let mut s = StyleSheet::builtin();
+        s.upsert(Style { id: "BaseA".into(), name: "Base A".into(), based_on: Some("Normal".into()), ..Default::default() });
+        s.upsert(Style { id: "ChildB".into(), name: "Child B".into(), based_on: Some("BaseA".into()), ..Default::default() });
+        assert!(s.causes_cycle("BaseA", "BaseA"));
+        assert!(s.causes_cycle("BaseA", "ChildB"));
+        assert!(!s.causes_cycle("BaseA", "Normal"));
+        // Attempting to upsert a cycle clears based_on rather than corrupting the chain
+        s.upsert(Style { id: "BaseA".into(), name: "Base A".into(), based_on: Some("ChildB".into()), ..Default::default() });
+        assert_eq!(s.get("BaseA").unwrap().based_on, None);
     }
 }

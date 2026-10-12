@@ -3856,3 +3856,17 @@ fn format_font_sets_the_asian_and_latin_fonts_separately() {
     assert_eq!(fonts(&s), before);
     assert!(s.run("format.font", &json!({})).is_err() && s.run("format.font", &json!({"eastAsia": " "})).is_err());
 }
+
+#[test]
+fn style_inheritance_cycle_rejected() {
+    let mut s = s();
+    run(&mut s, "para.createStyle", json!({"name": "Custom1", "basedOn": "Normal"}));
+    run(&mut s, "para.createStyle", json!({"name": "Custom2", "basedOn": "Custom1"}));
+    // Trying to create a style that cycles back on itself is rejected
+    assert!(s.run("para.createStyle", &json!({"name": "CustomLoop", "basedOn": "CustomLoop"})).is_err());
+    // Modifying Custom1 to be based on Custom2 would create a cycle: Custom1 -> Custom2 -> Custom1
+    let err = s.run("para.modifyStyle", &json!({"style": "Custom1", "basedOn": "Custom2"}));
+    assert!(err.is_err_and(|e| e.to_string().contains("circular style inheritance")));
+    // Table style cycles are also rejected
+    assert!(s.run("table.newStyle", &json!({"name": "TableLoop", "basedOn": "TableLoop"})).is_err());
+}

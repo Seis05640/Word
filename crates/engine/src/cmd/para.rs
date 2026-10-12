@@ -835,7 +835,16 @@ fn create_style(s: &mut Session, v: &Value) -> CmdResult {
         return Err(CmdError::Failed(format!("a style named `{name}` already exists")));
     }
     let id = s.doc.styles.new_id(&name);
-    let based = p::str(v, "basedOn").and_then(|b| s.doc.styles.find(b).map(|x| x.id.clone())).or(Some("Normal".into()));
+    let based = match p::str(v, "basedOn") {
+        Some(b) => {
+            let b_id = s.doc.styles.find(b).map(|x| x.id.clone()).ok_or_else(|| CmdError::Params(format!("no style `{b}`")))?;
+            if s.doc.styles.causes_cycle(&id, &b_id) {
+                return Err(CmdError::Params("circular style inheritance (basedOn cycle)".into()));
+            }
+            Some(b_id)
+        }
+        None => s.doc.styles.find("Normal").map(|x| x.id.clone()),
+    };
     let mut st = Style {
         id: id.clone(),
         name,
@@ -870,9 +879,22 @@ fn modify_style(s: &mut Session, v: &Value) -> CmdResult {
     let chr: Option<CharProps> = v.get("chr").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| CmdError::Params(e.to_string()))?;
     let para: Option<ParaProps> =
         v.get("para").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| CmdError::Params(e.to_string()))?;
+    let based_on = match p::str(v, "basedOn") {
+        Some(b) => {
+            let b_id = style_id(s, b)?;
+            if s.doc.styles.causes_cycle(&id, &b_id) {
+                return Err(CmdError::Params("circular style inheritance (basedOn cycle)".into()));
+            }
+            Some(b_id)
+        }
+        None => None,
+    };
     let next = p::str(v, "next").map(str::to_string);
     let name = p::str(v, "name").map(str::to_string);
     let st = s.doc.styles.get_mut(&id).ok_or_else(|| CmdError::Params("no such style".into()))?;
+    if let Some(b) = based_on {
+        st.based_on = Some(b);
+    }
     if let Some(c) = chr {
         st.chr.overlay(&c);
     }

@@ -41,6 +41,11 @@ sync_github_name = false
 [people.henno]
 sync_github_name = true
 
+[people.yeniufuklar-com]
+real_name = "Ufuk Efe"
+display_name = "Ufuk Efe"
+sync_github_name = true
+
 [people.DevCoderMax]
 real_name = "Gleyson do Nascimento Carvalho"
 display_name = "Gleyson Carvalho"

@@ -2271,6 +2271,12 @@ fn proof_issues(p: &Paragraph, opts: &crate::ProofOptions) -> Vec<(usize, usize,
     let skip = |a: usize, b: usize| {
         p.run_ranges().any(|(r, c)| r.start < b && a < r.end && (c.no_proof == Some(true) || c.hidden == Some(true) || c.link.is_some()))
     };
+    // The external checker's result for this text when it has one (#575), grammar marks only
+    // when grammar is marked.
+    if let Some(found) = wordcraft_proof::check_external(&text) {
+        let grammar = |i: &wordcraft_proof::Issue| i.kind == wordcraft_proof::IssueKind::Grammar;
+        return found.into_iter().filter(|i| !skip(i.start, i.end) && (opts.grammar || !grammar(i))).map(|i| (i.start, i.end, grammar(&i))).collect();
+    }
     let mut v: Vec<(usize, usize, bool)> = wordcraft_proof::check_spelling_with(&text, &opts.spelling)
         .into_iter()
         .filter(|i| !skip(i.start, i.end))

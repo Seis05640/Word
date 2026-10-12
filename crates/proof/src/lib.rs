@@ -11,6 +11,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod dict;
+pub mod external;
 pub mod hyphen;
 pub mod patterns;
 
@@ -78,6 +79,12 @@ pub fn remove_word(w: &str) -> bool {
 /// A number that changes whenever a word is added to or removed from the user dictionary.
 pub fn dictionary_generation() -> u64 {
     DICTIONARY_GENERATION.load(Ordering::Relaxed)
+}
+
+/// Whether `w` is in the user dictionary (added or ignored), any case.
+pub fn is_user_word(w: &str) -> bool {
+    let w = w.trim_matches(|c: char| !c.is_alphanumeric() && c != '\'' && c != '’').to_lowercase();
+    !w.is_empty() && user_words().read().unwrap_or_else(|e| e.into_inner()).contains(&w)
 }
 
 /// Words in the user dictionary.
@@ -323,6 +330,26 @@ pub fn check_spelling_with(text: &str, opts: &Options) -> Vec<Issue> {
     v
 }
 
+/// The external checker's issues for exactly `text`, if it has answered for it ([`external`]),
+/// without spelling issues on words the user added or ignored. `None`: use the built-in checks.
+pub fn check_external(text: &str) -> Option<Vec<Issue>> {
+    let found = external::get(text)?;
+    Some(found.into_iter().filter(|i| i.kind != IssueKind::Spelling || !text.get(i.start..i.end).is_some_and(is_user_word)).collect())
+}
+
+/// Every issue in a paragraph of text, sorted by start: an external checker's result for exactly
+/// this text when there is one ([`external`]; spelling issues on words the user added or ignored
+/// are left out), otherwise the built-in spelling and grammar checks.
+pub fn check(text: &str) -> Vec<Issue> {
+    if let Some(found) = check_external(text) {
+        return found;
+    }
+    let mut v = check_spelling(text);
+    v.extend(check_grammar(text));
+    v.sort_by_key(|i| i.start);
+    v
+}
+
 /// Grammar issues in a paragraph of text.
 pub fn check_grammar(text: &str) -> Vec<Issue> {
     let mut v = Vec::new();
@@ -541,9 +568,73 @@ mod tests {
         assert!(hyphen::hyphenate_word("hyphenation", &l).matches('-').count() >= 2);
     }
 
+    /// #575: an external checker's result replaces the built-in checks for exactly the text it
+    /// was computed for; edited text falls back; bad ranges are dropped; words the user added
+    /// to the dictionary lose their spelling issue.
+    #[test]
+    fn external_results_apply_to_their_exact_text() {
+        let text = "Zqxv external checker teh text 575.";
+        assert!(!external::has(text, "en-US"));
+        assert_eq!(external::stamp(text), 0);
+        let issue = |start, end, kind| Issue { start, end, kind, message: "m".into(), suggestions: vec!["x".into()] };
+        external::put(
+            text,
+            "en-US",
+            vec![
+                issue(26, 30, IssueKind::Grammar),
+                issue(22, 25, IssueKind::Spelling),
+                issue(0, 4, IssueKind::Spelling),
+                issue(5, 5, IssueKind::Grammar),    // empty
+                issue(30, 999, IssueKind::Grammar), // past the end
+                issue(40, 10, IssueKind::Spelling), // reversed
+            ],
+        );
+        let s1 = external::stamp(text);
+        assert!(s1 > 0);
+        let got: Vec<(usize, usize)> = check(text).iter().map(|i| (i.start, i.end)).collect();
+        assert_eq!(got, [(0, 4), (22, 25), (26, 30)]);
+        // Edited text: the built-in checks again (they flag "Zqxv").
+        let edited = "Zqxv external checker teh text 575!";
+        assert!(external::get(edited).is_none());
+        assert!(check(edited).iter().any(|i| i.kind == IssueKind::Spelling && edited.get(i.start..i.end) == Some("Zqxv")));
+        // Add to Dictionary hides the external spelling issue for that word.
+        add_word("zqxv");
+        let got: Vec<(usize, usize)> = check(text).iter().map(|i| (i.start, i.end)).collect();
+        assert_eq!(got, [(22, 25), (26, 30)]);
+        // A new result gets a new stamp.
+        external::put(text, "en-US", Vec::new());
+        assert!(external::stamp(text) > s1);
+        assert!(check(text).is_empty());
+    }
+
+    /// #575 review: a result counts only for the language it was checked in. When the paragraph's
+    /// language changes, the text is checked again and the new result replaces the old one.
+    #[test]
+    fn external_results_belong_to_their_language() {
+        let text = "Les enfant 575 jouent.";
+        let issue = |start, end| Issue { start, end, kind: IssueKind::Spelling, message: "m".into(), suggestions: Vec::new() };
+        external::put(text, "en-US", vec![issue(4, 10)]);
+        assert!(external::has(text, "en-US"));
+        assert!(!external::has(text, "fr-FR"), "a French paragraph needs a French result");
+        let s1 = external::stamp(text);
+        external::put(text, "fr-FR", vec![issue(0, 10)]);
+        assert!(external::has(text, "fr-FR") && !external::has(text, "en-US"));
+        assert!(external::stamp(text) > s1, "the new result redraws the paragraph");
+        assert_eq!(check(text).iter().map(|i| (i.start, i.end)).collect::<Vec<_>>(), [(0, 10)]);
+    }
+
+    /// #575: a range that cuts a character in two is dropped, never sliced.
+    #[test]
+    fn external_ranges_off_char_boundaries_are_dropped() {
+        let text = "é😀 575 boundaries";
+        external::put(text, "en-US", vec![Issue { start: 1, end: 3, kind: IssueKind::Grammar, message: String::new(), suggestions: Vec::new() }]);
+        assert_eq!(external::get(text), Some(Vec::new()));
+    }
+
     proptest::proptest! {
         #[test]
         fn never_panics(s in "\\PC{0,80}") {
+            let _ = check(&s);
             let _ = check_spelling(&s);
             let _ = check_grammar(&s);
             let _ = suggest(&s, 3);

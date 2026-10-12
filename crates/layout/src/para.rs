@@ -2231,8 +2231,14 @@ fn proof_issues(p: &Paragraph, opts: &crate::ProofOptions) -> Vec<(usize, usize,
         return Vec::new();
     }
     let text = proof_text(p);
+    // Runs Word would not proof are skipped: "do not check", hidden, links,
+    // and runs in a language without a dictionary (#100).
     let skip = |a: usize, b: usize| {
-        p.run_ranges().any(|(r, c)| r.start < b && a < r.end && (c.no_proof == Some(true) || c.hidden == Some(true) || c.link.is_some()))
+        p.run_ranges().any(|(r, c)| {
+            r.start < b
+                && a < r.end
+                && (c.no_proof == Some(true) || c.hidden == Some(true) || c.link.is_some() || !wordcraft_proof::has_dictionary(c.lang.as_deref()))
+        })
     };
     let mut v: Vec<(usize, usize, bool)> = wordcraft_proof::check_spelling_with(&text, &opts.spelling)
         .into_iter()

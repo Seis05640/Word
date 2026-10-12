@@ -161,6 +161,28 @@ fn known_core(w: &str) -> bool {
     false
 }
 
+/// Primary language subtags (BCP 47) that have a proofing dictionary. Only English for now; a
+/// language that gains one (Polish through system Hunspell, #346) is added here, so its runs are
+/// proofed again rather than skipped.
+pub const DICTIONARY_LANGS: &[&str] = &["en"];
+
+/// Is there a proofing dictionary for this BCP 47 language tag? `None` (and empty tags) mean the
+/// document default, which is en-US. Callers skip proofing runs in a language without one (#100)
+/// instead of flagging every word against another language's dictionary.
+pub fn has_dictionary(lang: Option<&str>) -> bool {
+    let Some(l) = lang.map(str::trim).filter(|l| !l.is_empty()) else { return true };
+    l.split(['-', '_']).next().is_some_and(|p| DICTIONARY_LANGS.iter().any(|d| p.eq_ignore_ascii_case(d)))
+}
+
+/// Is `word` spelled correctly in the run's proofing language? A language without a dictionary
+/// can't be checked, so every word counts as correct (no red underlines for it).
+pub fn is_correct_for(word: &str, lang: Option<&str>) -> bool {
+    if !has_dictionary(lang) {
+        return true;
+    }
+    is_correct(word)
+}
+
 /// Is `word` spelled correctly? Numbers, single letters, words in capitals and words with
 /// digits are accepted (Word's default [`Options`]).
 pub fn is_correct(word: &str) -> bool {
@@ -523,6 +545,35 @@ mod tests {
         assert!(is_correct("zxqwordcrafty"));
     }
 
+    /// #100: runs are proofed when their language has a dictionary (the default language too)
+    /// and skipped otherwise.
+    #[test]
+    fn dictionary_lang_tags() {
+        for l in [None, Some(""), Some("  "), Some("en"), Some("en-US"), Some("en-GB"), Some("EN-us"), Some("en_US")] {
+            assert!(has_dictionary(l), "{l:?}");
+        }
+        for l in [Some("lt-LT"), Some("fr-FR"), Some("de"), Some("uk"), Some("es"), Some("-US"), Some("e"), Some("eng")] {
+            assert!(!has_dictionary(l), "{l:?}");
+        }
+        // The gate follows the dictionaries, not English: every listed language is proofed.
+        for d in DICTIONARY_LANGS {
+            assert!(has_dictionary(Some(d)), "{d}");
+            assert!(has_dictionary(Some(&format!("{}-XX", d.to_ascii_uppercase()))), "{d}");
+        }
+    }
+
+    /// #100: runs in a language without a dictionary are never flagged; English still is.
+    #[test]
+    fn non_english_words_are_not_flagged() {
+        for w in ["ąžuolas", "élève", "über", "labas", "bonjour"] {
+            assert!(is_correct_for(w, Some("lt-LT")), "{w}");
+            assert!(is_correct_for(w, Some("fr-FR")), "{w}");
+        }
+        assert!(!is_correct_for("helo", Some("en-US")), "English typos still flagged");
+        assert!(!is_correct_for("helo", None), "default language still proofed");
+        assert!(is_correct_for("hello", Some("en-US")));
+    }
+
     /// File › Options › Proofing (#485): each "Ignore" choice turned off makes those words count.
     #[test]
     fn ignore_options_decide_what_is_checked() {
@@ -547,6 +598,8 @@ mod tests {
             let _ = check_spelling(&s);
             let _ = check_grammar(&s);
             let _ = suggest(&s, 3);
+            let _ = has_dictionary(Some(&s));
+            let _ = is_correct_for(&s, Some(&s));
             let _ = hyphen::hyphen_points(&s, &hyphen::Limits::default());
         }
     }

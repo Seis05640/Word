@@ -646,3 +646,84 @@ fn bundled_interface_fonts_cover_turkish_without_system_fallbacks() {
     }
     assert!(!lang("tr").uses_cjk());
 }
+
+#[test]
+fn hungarian_locales_and_saved_preference_work_without_changing_the_document() {
+    let hu = lang("hu");
+    for tag in ["hu", "hu-HU", "hu_HU.UTF-8", "HU_hu.UTF-8@euro", "hu-Latn-HU"] {
+        assert_eq!(lang_from_tag(tag), Some(hu), "{tag}");
+    }
+    assert_eq!(first_supported(["fr-FR", "hu-HU", "en-US"]), Some(hu));
+    assert_eq!(normalize_pref("HU"), Some("hu"));
+    let mut app = crate::WordApp::new(wordcraft_engine::Session::new(wordcraft_engine::sample::sample_document()), Default::default());
+    let before = serde_json::to_value(&app.session.doc).unwrap();
+    let result = app.run("ui.language", serde_json::json!({"value": "hu"})).unwrap();
+    assert_eq!(result["effective"], "hu");
+    assert!(result["available"].as_array().unwrap().iter().any(|l| l["code"] == "hu" && l["name"] == "Magyar"));
+    assert_eq!(serde_json::to_value(&app.session.doc).unwrap(), before);
+    let saved = serde_json::to_string(&app.ui).unwrap();
+    let restored: crate::UiState = serde_json::from_str(&saved).unwrap();
+    assert_eq!(Lang::from_pref(&restored.language), hu);
+    app.run("ui.language", serde_json::json!({"value": "auto"})).unwrap();
+    assert_eq!(app.ui.language, AUTO);
+}
+
+#[test]
+fn hungarian_catalog_translates_the_interface() {
+    use std::collections::HashSet;
+    let keys = |source| parse_entries(source).0.into_iter().map(|e| e.source).collect::<HashSet<_>>();
+    // Hungarian is a partial catalog: strings of dialogs newer than it show in English until
+    // translated. Every tab and command label is checked by `every_tab_and_command_is_translated`.
+    let hu_keys = keys(lang("hu").0.source);
+    assert!(hu_keys.len() > 1_900, "{} entries", hu_keys.len());
+    let hu = lang("hu");
+    for (source, expected) in [
+        ("Home", "Kezdőlap"),
+        ("Font", "Betűtípus"),
+        ("Review", "Véleményezés"),
+        ("Header", "Élőfej"),
+        ("Track Changes", "Változáskövetés"),
+        ("Save", "Mentés"),
+        ("Redo", "Újra"),
+        ("UPPERCASE", "NAGYBETŰS"),
+        ("WordCraft", "WordCraft"),
+        ("unknown future label", "unknown future label"),
+    ] {
+        assert_eq!(super::tr(hu, source), expected);
+    }
+    assert_eq!(fmt(super::tr(hu, "Page {page} of {pages}"), &[("page", "3"), ("pages", "9")]), "Oldal: 3/9");
+    // A noun after a number stays singular in Hungarian, whatever the count.
+    for count in [0, 1, 2, 21, 1000] {
+        let words = count.to_string();
+        assert_eq!(fmt(super::tr(hu, "{words} words"), &[("words", &words)]), format!("{count} szó"));
+    }
+    // The Font dialog uppercases its preview sample for All Caps.
+    assert_eq!(super::tr(hu, "AaBbYyZz").to_uppercase(), "AABBYYZZ ŐŐŰŰ");
+    set_current(hu);
+    // Built-in styles show translated names; numbered families go through their template.
+    for (style, expected) in [("Normal", "Normál"), ("No Spacing", "Nincs térköz"), ("Heading 2", "Címsor 2"), ("TOC 3", "Tartalomjegyzék 3")] {
+        assert_eq!(builtin_style_name(style), expected);
+    }
+    assert_eq!(builtin_style_name("My Own Style"), "My Own Style");
+    assert_eq!(location("Home › Font"), "Kezdőlap › Betűtípus");
+    assert_eq!(prefixed("Undo", "Bold"), "Visszavonás: Félkövér");
+    set_current(Lang::EN);
+}
+
+#[test]
+fn bundled_interface_fonts_cover_hungarian_without_system_fallbacks() {
+    let db = wordcraft_fonts::FontDb::with_font_dirs(Vec::new());
+    let (entries, errors) = parse_entries(lang("hu").0.source);
+    assert!(errors.is_empty());
+    let extra = "ÁáÉéÍíÓóÖöŐőÚúÜüŰű";
+    let chars: std::collections::HashSet<char> =
+        entries.iter().flat_map(|e| e.translation.chars()).filter(|c| extra.contains(*c)).chain(extra.chars()).collect();
+    for (family, style) in [("Inter", "Regular"), ("Inter", "Medium"), ("Inter", "SemiBold"), ("JetBrains Mono", "Regular")] {
+        let face = db.face(family, style);
+        assert_eq!(face.family, family, "must use the bundled interface face");
+        for ch in &chars {
+            assert_ne!(face.glyph_for(*ch), 0, "{family} {style} lacks {ch}");
+        }
+    }
+    assert!(!lang("hu").uses_cjk());
+}

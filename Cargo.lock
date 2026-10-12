@@ -5014,6 +5014,7 @@ dependencies = [
  "wordcraft-control-key",
  "wordcraft-doc",
  "wordcraft-engine",
+ "wordcraft-proof",
  "wordcraft-ui-egui",
 ]
 
